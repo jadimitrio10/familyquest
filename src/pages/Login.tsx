@@ -4,12 +4,23 @@ import { useNavigate } from 'react-router-dom'
 import { useFamilyStore } from '@/stores/familyStore'
 import { useTasksStore } from '@/stores/tasksStore'
 import { useRewardsStore } from '@/stores/rewardsStore'
+import { SparklesText } from '@/components/21st/SparklesText'
 import {
   DEMO_FAMILY, DEMO_MEMBERS, DEMO_TASKS, DEMO_INSTANCES, DEMO_REWARDS,
 } from '@/lib/demoData'
-import { floatAnimation } from '@/lib/animations'
 
-const FLOATING_EMOJIS = ['⭐', '🌟', '🎯', '🏆', '🎁', '🌈', '🚀', '💫', '🎉', '✨', '🌸', '⚡']
+const BUBBLES = [
+  { emoji: '⭐', x: 8,  y: 12, dur: 3.2, delay: 0 },
+  { emoji: '🌟', x: 20, y: 70, dur: 2.8, delay: 0.4 },
+  { emoji: '🎯', x: 35, y: 20, dur: 3.5, delay: 0.8 },
+  { emoji: '🏆', x: 55, y: 80, dur: 2.9, delay: 0.2 },
+  { emoji: '🎁', x: 70, y: 15, dur: 3.1, delay: 0.6 },
+  { emoji: '🌈', x: 82, y: 65, dur: 3.3, delay: 1.0 },
+  { emoji: '🚀', x: 90, y: 35, dur: 2.7, delay: 0.3 },
+  { emoji: '💫', x: 15, y: 45, dur: 3.0, delay: 0.7 },
+  { emoji: '🎉', x: 48, y: 55, dur: 3.4, delay: 0.5 },
+  { emoji: '✨', x: 63, y: 40, dur: 2.6, delay: 0.9 },
+]
 
 export function Login() {
   const navigate = useNavigate()
@@ -49,76 +60,83 @@ export function Login() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden"
-      style={{ background: 'linear-gradient(135deg, #DDD6FE 0%, #BAE6FD 50%, #FDE68A 100%)' }}
+    <div
+      className="min-h-screen relative overflow-hidden flex items-center justify-center"
+      style={{
+        background: 'linear-gradient(145deg, #EDE9FE 0%, #E0F2FE 40%, #FDE68A 80%, #FBCFE8 100%)',
+      }}
     >
       {/* Floating background emojis */}
-      {FLOATING_EMOJIS.map((emoji, i) => (
+      {BUBBLES.map((b, i) => (
         <motion.div
           key={i}
-          className="absolute text-3xl pointer-events-none select-none opacity-30"
-          style={{
-            left: `${(i * 8.3) % 100}%`,
-            top: `${(i * 13.7 + 10) % 90}%`,
-          }}
-          animate={{
-            y: [0, -20 - (i % 3) * 10, 0],
-            rotate: [0, (i % 2 === 0 ? 10 : -10), 0],
-          }}
-          transition={{
-            duration: 3 + (i % 3),
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: i * 0.4,
-          }}
+          className="absolute pointer-events-none select-none text-3xl opacity-25"
+          style={{ left: `${b.x}%`, top: `${b.y}%` }}
+          animate={{ y: [0, -18, 0], rotate: [0, 8, -8, 0] }}
+          transition={{ duration: b.dur, repeat: Infinity, ease: 'easeInOut', delay: b.delay }}
         >
-          {emoji}
+          {b.emoji}
         </motion.div>
       ))}
 
       <motion.div
-        initial={{ opacity: 0, y: 30 }}
+        initial={{ opacity: 0, y: 32 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="relative z-10 flex flex-col items-center gap-6 px-6 w-full max-w-sm"
+        transition={{ duration: 0.55, ease: 'easeOut' }}
+        className="relative z-10 w-full max-w-sm px-5 flex flex-col items-center gap-6"
       >
         {/* Logo */}
         <motion.div
+          className="text-center"
           animate={{ y: [0, -10, 0] }}
           transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-          className="text-center"
         >
-          <div className="text-7xl mb-2">🏆</div>
-          <h1
-            className="font-black text-5xl text-gray-800"
-            style={{ fontFamily: 'Nunito, sans-serif' }}
+          <div className="text-7xl mb-3">🏆</div>
+          {/* SparklesText de 21st.dev */}
+          <SparklesText
+            text="FamilyQuest"
+            className="font-black text-5xl"
+            colors={{ first: '#7C3AED', second: '#DB2777' }}
+            sparklesCount={8}
+          />
+          <p
+            className="mt-2 font-semibold"
+            style={{ color: '#4b5563', fontFamily: 'Quicksand, sans-serif', fontSize: 16 }}
           >
-            FamilyQuest
-          </h1>
-          <p className="text-gray-600 font-semibold mt-1" style={{ fontFamily: 'Quicksand, sans-serif' }}>
-            Make chores an adventure ✨
+            Las tareas como una aventura ✨
           </p>
         </motion.div>
 
-        {/* Demo button */}
+        {/* Demo CTA */}
         <motion.button
-          whileHover={{ scale: 1.03 }}
+          whileHover={{ scale: 1.03, y: -2 }}
           whileTap={{ scale: 0.97 }}
           onClick={enterDemo}
-          className="w-full py-4 rounded-3xl font-black text-xl text-white shadow-lg"
+          className="w-full py-4 rounded-3xl font-black text-xl text-white relative overflow-hidden"
           style={{
-            background: 'linear-gradient(135deg, #7C3AED, #DB2777)',
-            minHeight: 60,
+            background: 'linear-gradient(135deg, #7C3AED 0%, #DB2777 100%)',
+            minHeight: 64,
             fontFamily: 'Nunito, sans-serif',
+            boxShadow: '0 8px 32px rgba(124,58,237,0.4)',
           }}
         >
-          🎭 Try Demo Mode
+          <motion.span
+            className="absolute inset-0"
+            style={{
+              background: 'linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.25) 50%, transparent 70%)',
+              backgroundSize: '200% 100%',
+            }}
+            animate={{ backgroundPosition: ['200% 0', '-200% 0'] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+          />
+          <span className="relative">🎭 Probar Demo</span>
         </motion.button>
 
+        {/* Divider */}
         <div className="w-full flex items-center gap-3">
-          <div className="flex-1 h-px bg-white/50" />
-          <span className="text-gray-500 font-semibold text-sm">or</span>
-          <div className="flex-1 h-px bg-white/50" />
+          <div className="flex-1 h-px bg-white/60" />
+          <span className="text-sm font-semibold" style={{ color: '#6b7280' }}>o</span>
+          <div className="flex-1 h-px bg-white/60" />
         </div>
 
         {/* Create family */}
@@ -129,12 +147,20 @@ export function Login() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => setShowCreate(true)}
-              className="w-full py-4 rounded-3xl font-bold text-lg bg-white/80 text-gray-700 shadow-md hover:bg-white transition-colors"
-              style={{ minHeight: 56, fontFamily: 'Quicksand, sans-serif' }}
+              className="w-full py-4 rounded-3xl font-bold text-lg transition-colors"
+              style={{
+                background: 'rgba(255,255,255,0.75)',
+                backdropFilter: 'blur(8px)',
+                color: '#374151',
+                minHeight: 56,
+                fontFamily: 'Quicksand, sans-serif',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+              }}
             >
-              👨‍👩‍👧‍👦 Create a Family
+              👨‍👩‍👧‍👦 Crear mi Familia
             </motion.button>
           ) : (
             <motion.div
@@ -148,19 +174,34 @@ export function Login() {
                 type="text"
                 value={familyName}
                 onChange={(e) => setFamilyName(e.target.value)}
-                placeholder="Your family name..."
-                className="w-full rounded-2xl bg-white/90 border-2 border-white px-4 py-3 text-lg font-semibold focus:outline-none focus:border-purple-400"
-                style={{ minHeight: 52 }}
                 onKeyDown={(e) => e.key === 'Enter' && createFamily()}
+                placeholder="Nombre de la familia..."
+                autoFocus
+                className="w-full rounded-2xl px-4 py-3 text-lg font-semibold focus:outline-none"
+                style={{
+                  background: 'rgba(255,255,255,0.9)',
+                  border: '2px solid rgba(124,58,237,0.3)',
+                  minHeight: 56,
+                  fontFamily: 'Nunito, sans-serif',
+                  color: '#1f2937',
+                }}
               />
-              <button
+              <motion.button
+                whileTap={{ scale: 0.97 }}
                 onClick={createFamily}
                 disabled={!familyName.trim()}
-                className="w-full py-4 rounded-3xl font-black text-xl text-white bg-purple-500 hover:bg-purple-600 disabled:opacity-50 transition-colors"
-                style={{ minHeight: 60, fontFamily: 'Nunito, sans-serif' }}
+                className="w-full py-4 rounded-3xl font-black text-xl text-white"
+                style={{
+                  background: familyName.trim()
+                    ? 'linear-gradient(135deg, #7C3AED, #0284C7)'
+                    : '#d1d5db',
+                  minHeight: 60,
+                  fontFamily: 'Nunito, sans-serif',
+                  transition: 'background 0.3s',
+                }}
               >
-                Start Quest! 🚀
-              </button>
+                ¡Empezar aventura! 🚀
+              </motion.button>
             </motion.div>
           )}
         </AnimatePresence>

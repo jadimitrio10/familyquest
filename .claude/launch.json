@@ -2,10 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "family-quest",
+      "name": "familyquest-new",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev", "--port", "5173"],
-      "port": 5173
+      "runtimeArgs": ["dev", "--port", "5176"],
+      "port": 5176
     }
   ]
 }
