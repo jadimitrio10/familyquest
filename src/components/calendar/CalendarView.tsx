@@ -65,8 +65,13 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
       />
 
       {/* Member chips */}
-      <div style={{ display:'flex', gap:10, padding:'0 16px 12px', flexShrink:0 }}>
-        {MEMBERS.map(member => (
+      <div style={{ display:'flex', gap:10, padding:'0 16px 12px', flexShrink:0, flexWrap:'wrap' }}>
+        {MEMBERS.length === 0 && (
+          <p style={{ fontSize:13, color:'var(--text-3)', fontFamily:'Inter', padding:'8px 0' }}>
+            👋 Go to Settings to add family members, then click "+ Add Event"
+          </p>
+        )}
+        {MEMBERS.map(member => !member?.bgColor ? null : (
           <MemberChip
             key={member.id}
             member={member}
@@ -76,6 +81,7 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
           />
         ))}
       </div>
+
 
       {/* Calendar grid */}
       <AnimatePresence mode="wait">

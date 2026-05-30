@@ -44,7 +44,9 @@ export function DayColumn({ label, num, isToday, events, members, activeMemberId
       {/* Events */}
       <div style={{ flex:1, overflowY:'auto', padding:'6px 0' }}>
         {visible.map((event, idx) => {
-          const member = members.find(m => m.id === event.memberId)!
+          const member = members.find(m => m.id === event.memberId)
+          // Skip events whose member no longer exists
+          if (!member) return null
           return (
             <div key={event.id} style={{ padding:'0 6px' }}>
               <EventCard event={event} member={member} onToggle={onToggle} onClick={onEventClick} animDelay={colIndex*0.04+idx*0.04}/>
