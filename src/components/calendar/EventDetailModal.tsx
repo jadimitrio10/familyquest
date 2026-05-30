@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Trash2, Edit2, Check, Clock, Calendar } from 'lucide-react'
 import type { CalendarEvent, CalendarMember } from '@/types/calendar.types'
-import { MEMBERS } from '@/types/calendar.types'
+import { useMembersStore } from '@/hooks/useMembersStore'
 
 interface EventDetailModalProps {
   event: CalendarEvent | null
@@ -17,8 +17,13 @@ export function EventDetailModal({ event, onClose, onDelete, onUpdate, onToggle 
   const [title, setTitle] = useState('')
   const [emoji, setEmoji] = useState('')
 
+  const { members: storeMembers } = useMembersStore()
   if (!event) return null
-  const member = MEMBERS.find(m => m.id === event.memberId)!
+  const storeMember = storeMembers.find(m => m.id === event.memberId)
+  // Build a CalendarMember-compatible object from store
+  const member: CalendarMember = storeMember
+    ? { id: storeMember.id, name: storeMember.name, avatar: storeMember.emoji, bgColor: storeMember.bgColor, textColor: storeMember.textColor, barColor: storeMember.barColor, bgVar:'', textVar:'', barVar:'' }
+    : { id: event.memberId, name: 'Unknown', avatar: '👤', bgColor: '#F3F4F6', textColor: '#6B7280', barColor: '#9CA3AF', bgVar:'', textVar:'', barVar:'' }
 
   function startEdit() {
     setTitle(event!.title)
