@@ -8,15 +8,29 @@ import { NextWeekColumn } from './NextWeekColumn'
 import { AddEventModal } from './AddEventModal'
 import { EventDetailModal } from './EventDetailModal'
 import { useCalendarStore } from '@/hooks/useCalendarStore'
-import { MEMBERS, WEEK_DAYS, type CalendarEvent } from '@/types/calendar.types'
+import { WEEK_DAYS, type CalendarEvent, type CalendarMember } from '@/types/calendar.types'
+import type { Member } from '@/hooks/useMembersStore'
 import { addDays, format } from 'date-fns'
 
-export function CalendarView() {
+// Convert Member (from useMembersStore) to CalendarMember shape
+function toCalendarMembers(members: Member[]): CalendarMember[] {
+  return members.map(m => ({
+    id: m.id, name: m.name,
+    avatar: m.emoji, avatarUrl: m.photoDataUrl,
+    // Also expose emoji so MemberChip works
+    emoji: m.emoji, photoDataUrl: m.photoDataUrl,
+    bgColor: m.bgColor, textColor: m.textColor, barColor: m.barColor,
+    bgVar:'', textVar:'', barVar:'',
+  }) as CalendarMember & { emoji: string; photoDataUrl?: string })
+}
+
+export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
   const [activeMember, setActiveMember] = useState<string | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [weekOffset, setWeekOffset] = useState(0)
   const { events, toggleEvent, addEvent, deleteEvent, updateEvent } = useCalendarStore()
+  const MEMBERS = rawMembers ? toCalendarMembers(rawMembers) : toCalendarMembers([])
 
   const baseDate = new Date('2024-09-11')
   const weekStart = addDays(baseDate, weekOffset * 7)
