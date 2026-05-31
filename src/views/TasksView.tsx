@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Trash2, Check, RefreshCw, Calendar, ChevronDown, ChevronRight } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { motion, AnimatePresence, Reorder } from 'framer-motion'
+import {
+  Plus, Trash2, Check, RefreshCw, ChevronDown, ChevronRight,
+  Repeat2, CalendarDays, Flag, StickyNote, X, Sparkles
+} from 'lucide-react'
 import { useMembersStore } from '@/hooks/useMembersStore'
 import { MemberAvatar } from '@/components/shared/MemberAvatar'
 import { EmojiPicker } from '@/components/shared/EmojiPicker'
@@ -11,7 +14,7 @@ export interface Task {
   emoji: string
   memberId: string
   done: boolean
-  type: 'fixed' | 'once'        // fixed = recurring daily, once = one-time
+  type: 'fixed' | 'once'
   priority: 'high' | 'medium' | 'low'
   dueDate?: string
   notes?: string
@@ -20,178 +23,265 @@ export interface Task {
 const STORAGE_KEY = 'fq_tasks_v2'
 
 function loadTasks(): Task[] {
-  try {
-    const v = localStorage.getItem(STORAGE_KEY)
-    return v ? JSON.parse(v) : []
-  } catch { return [] }
+  try { const v = localStorage.getItem(STORAGE_KEY); return v ? JSON.parse(v) : [] } catch { return [] }
 }
 
-const PRIORITY_COLOR: Record<string, string> = { high: '#EF4444', medium: '#F59E0B', low: '#10B981' }
+// Priority config
+const PRIORITY = {
+  high:   { label: 'High',   color: '#EF4444', bg: '#FEF2F2', dot: '🔴' },
+  medium: { label: 'Medium', color: '#F59E0B', bg: '#FFFBEB', dot: '🟡' },
+  low:    { label: 'Low',    color: '#10B981', bg: '#F0FDF4', dot: '🟢' },
+}
+
+const spring = { type: 'spring' as const, stiffness: 400, damping: 28 }
 
 export function TasksView() {
   const { members } = useMembersStore()
   const [tasks, setTasks] = useState<Task[]>(loadTasks)
-  const [activeMember, setActiveMember] = useState<string>(members[0]?.id ?? '')
-  const [showAdd, setShowAdd] = useState(false)
+  const [activeMember, setActiveMember] = useState<string>('')
+  const [showForm, setShowForm] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
-  const [expandedSections, setExpandedSections] = useState({ fixed: true, once: true, done: false })
+  const [expanded, setExpanded] = useState({ fixed: true, once: true, done: false })
+  const emojiRef = useRef<HTMLDivElement>(null)
 
-  // New task form state
   const [form, setForm] = useState({
-    title: '', emoji: '✅', type: 'once' as 'fixed' | 'once',
-    priority: 'medium' as 'high' | 'medium' | 'low', dueDate: '', notes: ''
+    title: '', emoji: '✅',
+    type: 'once' as 'fixed' | 'once',
+    priority: 'medium' as 'high' | 'medium' | 'low',
+    dueDate: '', notes: '',
   })
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)) } catch {}
   }, [tasks])
 
-  const member = members.find(m => m.id === activeMember)
-  const myTasks = tasks.filter(t => t.memberId === activeMember)
-  const fixedTasks  = myTasks.filter(t => t.type === 'fixed' && !t.done)
-  const onceTasks   = myTasks.filter(t => t.type === 'once' && !t.done)
-  const doneTasks   = myTasks.filter(t => t.done)
+  // Close emoji picker on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (emojiRef.current && !emojiRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const memberId = activeMember || members[0]?.id || ''
+  const member = members.find(m => m.id === memberId)
+  const myTasks = tasks.filter(t => t.memberId === memberId)
+  const fixedPending = myTasks.filter(t => t.type === 'fixed' && !t.done)
+  const oncePending  = myTasks.filter(t => t.type === 'once'  && !t.done)
+  const doneTasks    = myTasks.filter(t => t.done)
+  const totalDone    = doneTasks.length
+  const totalTasks   = myTasks.length
+  const pct          = totalTasks ? Math.round((totalDone / totalTasks) * 100) : 0
 
   const toggle = (id: string) => setTasks(ts => ts.map(t => t.id === id ? { ...t, done: !t.done } : t))
   const remove = (id: string) => setTasks(ts => ts.filter(t => t.id !== id))
-  const resetFixed = () => setTasks(ts => ts.map(t => t.memberId === activeMember && t.type === 'fixed' ? { ...t, done: false } : t))
+  const resetFixed = () => setTasks(ts => ts.map(t => t.memberId === memberId && t.type === 'fixed' ? { ...t, done: false } : t))
 
   function addTask() {
     if (!form.title.trim()) return
-    const newTask: Task = {
-      id: `t-${Date.now()}`,
-      title: form.title.trim(),
-      emoji: form.emoji,
-      memberId: activeMember,
-      done: false,
-      type: form.type,
+    setTasks(ts => [...ts, {
+      id: `t-${Date.now()}`, memberId,
+      title: form.title.trim(), emoji: form.emoji,
+      done: false, type: form.type,
       priority: form.priority,
       dueDate: form.dueDate || undefined,
       notes: form.notes || undefined,
-    }
-    setTasks(ts => [...ts, newTask])
+    }])
     setForm({ title: '', emoji: '✅', type: 'once', priority: 'medium', dueDate: '', notes: '' })
-    setShowAdd(false)
+    setShowForm(false)
   }
 
-  const toggleSection = (s: keyof typeof expandedSections) =>
-    setExpandedSections(prev => ({ ...prev, [s]: !prev[s] }))
-
-  const doneCount = doneTasks.length
-  const totalCount = myTasks.length
+  function toggleSection(s: keyof typeof expanded) {
+    setExpanded(p => ({ ...p, [s]: !p[s] }))
+  }
 
   return (
-    <div style={{ display: 'flex', height: '100%', background: 'var(--bg)', overflow: 'hidden' }}>
-      {/* LEFT — Member list */}
-      <div style={{ width: 200, background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-        <div style={{ padding: '16px 14px 10px', borderBottom: '1px solid var(--border)' }}>
-          <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'Inter' }}>Members</p>
+    <div style={{ display: 'flex', height: '100%', background: 'var(--bg)', overflow: 'hidden', fontFamily: 'Inter, sans-serif' }}>
+
+      {/* ── LEFT PANEL — member list ── */}
+      <div style={{ width: 210, background: 'var(--surface)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        <div style={{ padding: '20px 16px 12px' }}>
+          <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Members</p>
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 8px' }}>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 10px 16px' }}>
           {members.map(m => {
-            const mTasks = tasks.filter(t => t.memberId === m.id)
-            const mDone  = mTasks.filter(t => t.done).length
-            const isActive = m.id === activeMember
+            const mt   = tasks.filter(t => t.memberId === m.id)
+            const done = mt.filter(t => t.done).length
+            const pct  = mt.length ? Math.round((done / mt.length) * 100) : 0
+            const active = m.id === memberId
+
             return (
               <motion.button key={m.id} onClick={() => setActiveMember(m.id)} whileTap={{ scale: 0.97 }}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 12, border: 'none', background: isActive ? m.bgColor : 'transparent', cursor: 'pointer', marginBottom: 4, transition: 'background 150ms' }}>
-                <MemberAvatar member={m} size={34} />
-                <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: isActive ? m.textColor : 'var(--text-1)', fontFamily: 'Inter', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.name}</p>
-                  <p style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'Inter' }}>{mDone}/{mTasks.length} done</p>
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 14, border: 'none', background: active ? m.bgColor : 'transparent', cursor: 'pointer', marginBottom: 4, transition: 'background 180ms' }}>
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <MemberAvatar member={m} size={38} />
+                  {active && (
+                    <div style={{ position: 'absolute', bottom: -1, right: -1, width: 10, height: 10, borderRadius: '50%', background: m.barColor, border: '2px solid var(--surface)' }} />
+                  )}
                 </div>
-                {isActive && <div style={{ width: 6, height: 6, borderRadius: '50%', background: m.barColor, flexShrink: 0 }} />}
+                <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: active ? m.textColor : 'var(--text-1)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</p>
+                  <div style={{ height: 3, borderRadius: 2, background: active ? `${m.barColor}30` : 'var(--border)', overflow: 'hidden' }}>
+                    <motion.div animate={{ width: `${pct}%` }} transition={{ duration: 0.6, ease: 'easeOut' }}
+                      style={{ height: '100%', borderRadius: 2, background: m.barColor }} />
+                  </div>
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 600, color: active ? m.textColor : 'var(--text-3)', flexShrink: 0 }}>{done}/{mt.length}</span>
               </motion.button>
             )
           })}
+
+          {members.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '24px 8px', color: 'var(--text-3)' }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>👥</div>
+              <p style={{ fontSize: 12, fontWeight: 500 }}>Add members in Settings</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* RIGHT — Tasks */}
+      {/* ── RIGHT PANEL ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
         {/* Header */}
-        <div style={{ padding: '16px 20px 12px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
-          {member && <MemberAvatar member={member} size={40} />}
-          <div style={{ flex: 1 }}>
-            <h1 style={{ fontSize: 20, fontWeight: 700, fontFamily: 'Inter', color: 'var(--text-1)' }}>{member?.name ?? 'Tasks'}</h1>
-            <p style={{ fontSize: 12, color: 'var(--text-3)', fontFamily: 'Inter' }}>{doneCount}/{totalCount} completed today</p>
+        <div style={{ padding: '18px 24px 14px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 16 }}>
+          {member && <MemberAvatar member={member} size={44} />}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h1 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-1)', lineHeight: 1.2, marginBottom: 6 }}>
+              {member?.name ?? 'Tasks'}
+              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-3)', marginLeft: 10 }}>
+                {totalDone}/{totalTasks} done
+              </span>
+            </h1>
+            {/* Progress bar */}
+            <div style={{ height: 6, borderRadius: 3, background: 'var(--border)', overflow: 'hidden', width: '100%', maxWidth: 300 }}>
+              <motion.div animate={{ width: `${pct}%` }} transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+                style={{ height: '100%', borderRadius: 3, background: member?.barColor ?? 'var(--blue)' }} />
+            </div>
           </div>
-          {/* Progress bar */}
-          <div style={{ width: 100, height: 6, borderRadius: 3, background: 'var(--border)', overflow: 'hidden' }}>
-            <motion.div animate={{ width: `${totalCount ? (doneCount / totalCount) * 100 : 0}%` }}
-              transition={{ type: 'spring', stiffness: 120, damping: 20 }}
-              style={{ height: '100%', borderRadius: 3, background: member?.barColor ?? 'var(--blue)' }} />
-          </div>
-          <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowAdd(v => !v)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: member?.barColor ?? 'var(--text-1)', color: '#fff', borderRadius: 20, padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'Inter', border: 'none', cursor: 'pointer' }}>
-            <Plus size={14} /> Add Task
+
+          {/* Add button */}
+          <motion.button
+            onClick={() => setShowForm(v => !v)}
+            whileTap={{ scale: 0.95 }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: showForm ? 'var(--border)' : (member?.barColor ?? 'var(--blue)'),
+              color: showForm ? 'var(--text-2)' : '#fff',
+              border: 'none', borderRadius: 14,
+              padding: '10px 20px', fontSize: 14, fontWeight: 700,
+              cursor: 'pointer', transition: 'all 200ms',
+              boxShadow: showForm ? 'none' : `0 4px 14px ${(member?.barColor ?? '#4F46E5')}40`,
+            }}
+          >
+            {showForm ? <X size={16} /> : <Plus size={16} strokeWidth={2.5} />}
+            {showForm ? 'Cancel' : 'Add Task'}
           </motion.button>
         </div>
 
-        {/* Add task form */}
+        {/* ── ADD TASK FORM ── */}
         <AnimatePresence>
-          {showAdd && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
-              style={{ overflow: 'hidden', background: member ? member.bgColor + '55' : 'var(--blue-bg)', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          {showForm && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.22, ease: 'easeInOut' }}
+              style={{ overflow: 'hidden', borderBottom: '1px solid var(--border)', flexShrink: 0 }}
+            >
+              <div style={{ padding: '20px 24px', background: member ? `${member.bgColor}66` : 'var(--bg)' }}>
+                {/* Title row */}
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 16 }}>
                   {/* Emoji button */}
-                  <div style={{ position: 'relative' }}>
-                    <button onClick={() => setShowEmojiPicker(v => !v)}
-                      style={{ width: 44, height: 44, borderRadius: 10, border: '1.5px solid var(--border)', background: 'var(--surface)', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div ref={emojiRef} style={{ position: 'relative' }}>
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => setShowEmojiPicker(v => !v)}
+                      style={{ width: 52, height: 52, borderRadius: 14, border: `2px solid ${showEmojiPicker ? (member?.barColor ?? 'var(--blue)') : 'var(--border)'}`, background: 'var(--surface)', fontSize: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 150ms' }}
+                    >
                       {form.emoji}
-                    </button>
+                    </motion.button>
                     <AnimatePresence>
                       {showEmojiPicker && (
-                        <motion.div initial={{ opacity: 0, scale: 0.95, y: -8 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                        <motion.div initial={{ opacity: 0, scale: 0.95, y: -6 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -6 }}
                           style={{ position: 'absolute', top: '110%', left: 0, zIndex: 99 }}>
-                          <EmojiPicker value={form.emoji} onChange={e => setForm(f => ({ ...f, emoji: e }))} onClose={() => setShowEmojiPicker(false)} />
+                          <EmojiPicker value={form.emoji} onChange={e => { setForm(f => ({ ...f, emoji: e })); setShowEmojiPicker(false) }} onClose={() => setShowEmojiPicker(false)} />
                         </motion.div>
                       )}
                     </AnimatePresence>
                   </div>
-                  <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-                    onKeyDown={e => e.key === 'Enter' && addTask()} placeholder="Task name..." autoFocus
-                    style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1.5px solid var(--border)', fontSize: 14, fontFamily: 'Inter', background: 'var(--surface)', outline: 'none', color: 'var(--text-1)' }} />
+
+                  <input
+                    value={form.title}
+                    onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                    onKeyDown={e => e.key === 'Enter' && addTask()}
+                    placeholder="What needs to be done?"
+                    autoFocus
+                    style={{ flex: 1, padding: '14px 18px', borderRadius: 14, border: '2px solid var(--border)', fontSize: 15, fontWeight: 500, fontFamily: 'Inter', color: 'var(--text-1)', outline: 'none', background: 'var(--surface)', transition: 'border-color 150ms' }}
+                    onFocus={e => e.currentTarget.style.borderColor = member?.barColor ?? 'var(--blue)'}
+                    onBlur={e => e.currentTarget.style.borderColor = 'var(--border)'}
+                  />
                 </div>
 
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                  {/* Type */}
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {[{ v: 'fixed', label: '🔄 Fixed', desc: 'Repeats daily' }, { v: 'once', label: '📅 One-time', desc: 'Happens once' }].map(opt => (
-                      <button key={opt.v} onClick={() => setForm(f => ({ ...f, type: opt.v as 'fixed' | 'once' }))}
-                        title={opt.desc}
-                        style={{ padding: '7px 14px', borderRadius: 10, border: `1.5px solid ${form.type === opt.v ? (member?.barColor ?? 'var(--blue)') : 'var(--border)'}`, background: form.type === opt.v ? (member?.bgColor ?? 'var(--blue-bg)') : 'var(--surface)', color: form.type === opt.v ? (member?.textColor ?? 'var(--blue)') : 'var(--text-2)', fontSize: 12, fontWeight: 600, fontFamily: 'Inter', cursor: 'pointer' }}>
+                {/* Options row */}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+                  {/* Type toggle */}
+                  <div style={{ display: 'flex', background: 'var(--surface)', borderRadius: 12, padding: 3, border: '1px solid var(--border)' }}>
+                    {([{ v: 'fixed', icon: Repeat2, label: 'Fixed' }, { v: 'once', icon: CalendarDays, label: 'One-time' }] as const).map(opt => (
+                      <button key={opt.v} onClick={() => setForm(f => ({ ...f, type: opt.v }))}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 10, border: 'none', background: form.type === opt.v ? (member?.barColor ?? 'var(--blue)') : 'transparent', color: form.type === opt.v ? '#fff' : 'var(--text-2)', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 180ms' }}>
+                        <opt.icon size={13} strokeWidth={2.5} />
                         {opt.label}
                       </button>
                     ))}
                   </div>
-                  {/* Priority */}
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {[{ v: 'high', label: '🔴 High' }, { v: 'medium', label: '🟡 Medium' }, { v: 'low', label: '🟢 Low' }].map(opt => (
-                      <button key={opt.v} onClick={() => setForm(f => ({ ...f, priority: opt.v as 'high' | 'medium' | 'low' }))}
-                        style={{ padding: '7px 14px', borderRadius: 10, border: `1.5px solid ${form.priority === opt.v ? PRIORITY_COLOR[opt.v] : 'var(--border)'}`, background: form.priority === opt.v ? PRIORITY_COLOR[opt.v] + '20' : 'var(--surface)', color: form.priority === opt.v ? PRIORITY_COLOR[opt.v] : 'var(--text-2)', fontSize: 12, fontWeight: 600, fontFamily: 'Inter', cursor: 'pointer' }}>
-                        {opt.label}
+
+                  {/* Priority pills */}
+                  <div style={{ display: 'flex', background: 'var(--surface)', borderRadius: 12, padding: 3, border: '1px solid var(--border)', gap: 2 }}>
+                    {(Object.entries(PRIORITY) as [string, typeof PRIORITY.high][]).map(([k, p]) => (
+                      <button key={k} onClick={() => setForm(f => ({ ...f, priority: k as 'high' | 'medium' | 'low' }))}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 13px', borderRadius: 10, border: 'none', background: form.priority === k ? p.bg : 'transparent', color: form.priority === k ? p.color : 'var(--text-3)', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 180ms' }}>
+                        <Flag size={12} strokeWidth={2.5} fill={form.priority === k ? p.color : 'none'} />
+                        {p.label}
                       </button>
                     ))}
                   </div>
+
+                  {/* Date (only for once) */}
                   {form.type === 'once' && (
-                    <input type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))}
-                      style={{ padding: '7px 12px', borderRadius: 10, border: '1.5px solid var(--border)', fontSize: 13, fontFamily: 'Inter', background: 'var(--surface)', outline: 'none', color: 'var(--text-1)' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', borderRadius: 12, background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                      <CalendarDays size={14} color="var(--text-3)" />
+                      <input type="date" value={form.dueDate} onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))}
+                        style={{ border: 'none', outline: 'none', fontSize: 13, fontFamily: 'Inter', color: 'var(--text-1)', background: 'transparent', cursor: 'pointer' }} />
+                    </div>
                   )}
                 </div>
 
-                <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="Notes (optional)..."
-                  style={{ padding: '8px 14px', borderRadius: 10, border: '1.5px solid var(--border)', fontSize: 13, fontFamily: 'Inter', background: 'var(--surface)', outline: 'none', color: 'var(--text-1)' }} />
+                {/* Notes */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderRadius: 12, background: 'var(--surface)', border: '1px solid var(--border)', marginBottom: 14 }}>
+                  <StickyNote size={14} color="var(--text-3)" />
+                  <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                    placeholder="Add a note (optional)..."
+                    style={{ flex: 1, border: 'none', outline: 'none', fontSize: 13, fontFamily: 'Inter', color: 'var(--text-1)', background: 'transparent' }} />
+                </div>
 
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <motion.button whileTap={{ scale: 0.96 }} onClick={addTask}
-                    style={{ flex: 1, padding: '10px', borderRadius: 10, background: member?.barColor ?? 'var(--blue)', color: '#fff', border: 'none', fontSize: 14, fontWeight: 700, fontFamily: 'Inter', cursor: 'pointer' }}>
-                    ✅ Add Task
+                {/* Submit */}
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <motion.button
+                    whileTap={{ scale: 0.97 }}
+                    onClick={addTask}
+                    disabled={!form.title.trim()}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 28px', borderRadius: 14, border: 'none', background: form.title.trim() ? (member?.barColor ?? 'var(--blue)') : 'var(--border)', color: form.title.trim() ? '#fff' : 'var(--text-3)', fontSize: 15, fontWeight: 700, cursor: form.title.trim() ? 'pointer' : 'default', transition: 'all 200ms', boxShadow: form.title.trim() ? `0 4px 16px ${(member?.barColor ?? '#4F46E5')}35` : 'none' }}
+                  >
+                    <Sparkles size={16} />
+                    Add Task
                   </motion.button>
-                  <button onClick={() => setShowAdd(false)}
-                    style={{ padding: '10px 18px', borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', fontSize: 14, fontFamily: 'Inter', cursor: 'pointer', color: 'var(--text-2)' }}>
+                  <button onClick={() => setShowForm(false)}
+                    style={{ padding: '12px 20px', borderRadius: 14, border: '1.5px solid var(--border)', background: 'transparent', fontSize: 14, fontWeight: 600, color: 'var(--text-2)', cursor: 'pointer', fontFamily: 'Inter' }}>
                     Cancel
                   </button>
                 </div>
@@ -200,56 +290,78 @@ export function TasksView() {
           )}
         </AnimatePresence>
 
-        {/* Task sections */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px' }}>
-          {/* Fixed tasks */}
+        {/* Task list */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px' }}>
+
+          {/* ── FIXED TASKS ── */}
           <TaskSection
-            title="🔄 Fixed Tasks"
+            icon={<Repeat2 size={14} strokeWidth={2.5} />}
+            title="Fixed Tasks"
             subtitle="Repeat every day"
-            tasks={fixedTasks}
-            expanded={expandedSections.fixed}
+            count={fixedPending.length}
+            expanded={expanded.fixed}
             onToggle={() => toggleSection('fixed')}
-            onTaskToggle={toggle}
-            onTaskRemove={remove}
-            member={member}
+            accentColor={member?.barColor}
             extra={
-              <button onClick={resetFixed} title="Reset all fixed tasks" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-3)', fontFamily: 'Inter', border: 'none', background: 'transparent', cursor: 'pointer', padding: '3px 8px', borderRadius: 6 }}>
+              <button onClick={resetFixed} title="Reset all fixed tasks to incomplete"
+                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: 'var(--text-3)', border: '1px solid var(--border)', background: 'var(--surface)', padding: '4px 10px', borderRadius: 8, cursor: 'pointer' }}>
                 <RefreshCw size={11} /> Reset
               </button>
             }
-          />
+          >
+            {fixedPending.map((task, i) => (
+              <TaskCard key={task.id} task={task} member={member} onToggle={toggle} onRemove={remove} delay={i * 0.04} />
+            ))}
+            {fixedPending.length === 0 && <EmptySection text="No fixed tasks" />}
+          </TaskSection>
 
-          {/* One-time tasks */}
+          {/* ── ONE-TIME TASKS ── */}
           <TaskSection
-            title="📅 One-time Tasks"
-            subtitle="Specific tasks and events"
-            tasks={onceTasks}
-            expanded={expandedSections.once}
+            icon={<CalendarDays size={14} strokeWidth={2.5} />}
+            title="One-time Tasks"
+            subtitle="Specific events & to-dos"
+            count={oncePending.length}
+            expanded={expanded.once}
             onToggle={() => toggleSection('once')}
-            onTaskToggle={toggle}
-            onTaskRemove={remove}
-            member={member}
-          />
+            accentColor={member?.barColor}
+          >
+            {oncePending.map((task, i) => (
+              <TaskCard key={task.id} task={task} member={member} onToggle={toggle} onRemove={remove} delay={i * 0.04} />
+            ))}
+            {oncePending.length === 0 && <EmptySection text="No pending tasks" />}
+          </TaskSection>
 
-          {/* Done */}
+          {/* ── DONE ── */}
           <TaskSection
-            title={`✅ Done (${doneTasks.length})`}
-            subtitle=""
-            tasks={doneTasks}
-            expanded={expandedSections.done}
+            icon={<Check size={14} strokeWidth={2.5} />}
+            title="Completed"
+            count={doneTasks.length}
+            expanded={expanded.done}
             onToggle={() => toggleSection('done')}
-            onTaskToggle={toggle}
-            onTaskRemove={remove}
-            member={member}
             dimmed
-          />
+          >
+            {doneTasks.map((task, i) => (
+              <TaskCard key={task.id} task={task} member={member} onToggle={toggle} onRemove={remove} delay={i * 0.03} dimmed />
+            ))}
+          </TaskSection>
 
-          {myTasks.length === 0 && (
-            <div style={{ textAlign: 'center', paddingTop: 60, color: 'var(--text-3)' }}>
-              <div style={{ fontSize: 52, marginBottom: 12 }}>🎯</div>
-              <p style={{ fontWeight: 700, fontFamily: 'Inter', fontSize: 18, color: 'var(--text-2)' }}>No tasks yet for {member?.name}</p>
-              <p style={{ fontSize: 13, color: 'var(--text-3)', fontFamily: 'Inter', marginTop: 6 }}>Click "+ Add Task" to get started</p>
-            </div>
+          {/* Empty state */}
+          {myTasks.length === 0 && !showForm && (
+            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+              style={{ textAlign: 'center', paddingTop: 60 }}>
+              <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                style={{ fontSize: 56, marginBottom: 16 }}>🎯</motion.div>
+              <p style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-1)', marginBottom: 8 }}>
+                No tasks yet for {member?.name}
+              </p>
+              <p style={{ fontSize: 14, color: 'var(--text-3)', marginBottom: 24 }}>
+                Add your first task and start tracking progress!
+              </p>
+              <motion.button whileTap={{ scale: 0.96 }} onClick={() => setShowForm(true)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', borderRadius: 14, border: 'none', background: member?.barColor ?? 'var(--blue)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', boxShadow: `0 4px 16px ${(member?.barColor ?? '#4F46E5')}40` }}>
+                <Plus size={18} /> Add First Task
+              </motion.button>
+            </motion.div>
           )}
         </div>
       </div>
@@ -257,58 +369,163 @@ export function TasksView() {
   )
 }
 
-function TaskSection({
-  title, subtitle, tasks, expanded, onToggle, onTaskToggle, onTaskRemove, member, extra, dimmed
-}: {
-  title: string; subtitle: string; tasks: Task[]
-  expanded: boolean; onToggle: () => void
-  onTaskToggle: (id: string) => void; onTaskRemove: (id: string) => void
-  member?: { bgColor: string; barColor: string; textColor: string } | null
-  extra?: React.ReactNode; dimmed?: boolean
+/* ── Section wrapper ── */
+function TaskSection({ icon, title, subtitle, count, expanded, onToggle, accentColor, extra, dimmed, children }: {
+  icon: React.ReactNode; title: string; subtitle?: string; count: number
+  expanded: boolean; onToggle: () => void; accentColor?: string
+  extra?: React.ReactNode; dimmed?: boolean; children: React.ReactNode
 }) {
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div style={{ marginBottom: 20 }}>
       <button onClick={onToggle}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', background: 'transparent', border: 'none', cursor: 'pointer', marginBottom: expanded ? 8 : 0 }}>
-        {expanded ? <ChevronDown size={14} color="var(--text-3)" /> : <ChevronRight size={14} color="var(--text-3)" />}
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-2)', fontFamily: 'Inter', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{title}</span>
-        {subtitle && <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'Inter' }}>· {subtitle}</span>}
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-3)', fontFamily: 'Inter', fontWeight: 600 }}>{tasks.length}</span>
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0 10px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+        <span style={{ color: 'var(--text-3)', display: 'flex', alignItems: 'center' }}>
+          {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: dimmed ? 'var(--text-3)' : (accentColor ?? 'var(--text-2)') }}>
+          {icon}
+          <span style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{title}</span>
+        </span>
+        {subtitle && (
+          <span style={{ fontSize: 11, color: 'var(--text-3)', fontWeight: 500 }}>· {subtitle}</span>
+        )}
+        {/* Count badge */}
+        {count > 0 && (
+          <span style={{ marginLeft: 4, minWidth: 20, height: 20, borderRadius: 10, background: accentColor ? `${accentColor}20` : 'var(--bg)', color: accentColor ?? 'var(--text-3)', fontSize: 11, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 6px' }}>
+            {count}
+          </span>
+        )}
+        <div style={{ flex: 1 }} />
         {extra && <div onClick={e => e.stopPropagation()}>{extra}</div>}
       </button>
 
-      <AnimatePresence>
+      <AnimatePresence initial={false}>
         {expanded && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            {tasks.map(task => (
-              <motion.div key={task.id} layout initial={{ opacity: 0, x: -8 }} animate={{ opacity: dimmed ? 0.55 : 1, x: 0 }} exit={{ opacity: 0, x: 8 }}
-                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', borderRadius: 12, background: 'var(--surface)', border: '1px solid var(--border)', marginBottom: 6 }}>
-                <motion.button whileTap={{ scale: 0.8 }} onClick={() => onTaskToggle(task.id)}
-                  style={{ width: 24, height: 24, borderRadius: '50%', border: `2px solid ${task.done ? (member?.barColor ?? '#10B981') : 'var(--border)'}`, background: task.done ? (member?.barColor ?? '#10B981') : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {task.done && <Check size={13} color="#fff" strokeWidth={3} />}
-                </motion.button>
-                <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{task.emoji}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 14, fontWeight: 500, fontFamily: 'Inter', color: 'var(--text-1)', textDecoration: task.done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.title}</p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: PRIORITY_COLOR[task.priority], display: 'inline-block', flexShrink: 0 }} />
-                    <span style={{ fontSize: 11, color: 'var(--text-3)', fontFamily: 'Inter', textTransform: 'capitalize' }}>{task.priority}</span>
-                    {task.type === 'fixed' && (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: 'var(--text-3)', fontFamily: 'Inter' }}><RefreshCw size={9} /> Daily</span>
-                    )}
-                    {task.dueDate && <span style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'Inter' }}><Calendar size={9} style={{ display: 'inline', marginRight: 3 }} />{task.dueDate}</span>}
-                    {task.notes && <span style={{ fontSize: 10, color: 'var(--text-3)', fontFamily: 'Inter', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.notes}</span>}
-                  </div>
-                </div>
-                <button onClick={() => onTaskRemove(task.id)}
-                  style={{ width: 28, height: 28, borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)', flexShrink: 0 }}>
-                  <Trash2 size={13} />
-                </button>
-              </motion.div>
-            ))}
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            style={{ overflow: 'hidden' }}
+          >
+            {children}
           </motion.div>
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+function EmptySection({ text }: { text: string }) {
+  return (
+    <div style={{ padding: '12px 16px', borderRadius: 12, background: 'var(--surface)', border: '1.5px dashed var(--border)', textAlign: 'center', color: 'var(--text-3)', fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
+      {text}
+    </div>
+  )
+}
+
+/* ── Task Card ── */
+function TaskCard({ task, member, onToggle, onRemove, delay = 0, dimmed }: {
+  task: Task
+  member?: { barColor: string; bgColor: string; textColor: string } | null
+  onToggle: (id: string) => void
+  onRemove: (id: string) => void
+  delay?: number
+  dimmed?: boolean
+}) {
+  const p = PRIORITY[task.priority]
+  const [hovered, setHovered] = useState(false)
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: dimmed ? 0.55 : 1, y: 0 }}
+      exit={{ opacity: 0, x: -12, height: 0 }}
+      transition={{ ...spring, delay }}
+      onHoverStart={() => setHovered(true)}
+      onHoverEnd={() => setHovered(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '12px 16px', borderRadius: 16, marginBottom: 8,
+        background: 'var(--surface)',
+        border: `1.5px solid ${hovered && !task.done ? (member?.barColor ?? 'var(--blue)') + '40' : 'var(--border)'}`,
+        boxShadow: hovered && !task.done ? `0 4px 16px rgba(0,0,0,0.06)` : '0 1px 3px rgba(0,0,0,0.04)',
+        transition: 'border-color 150ms, box-shadow 150ms',
+        cursor: 'default',
+      }}
+    >
+      {/* Checkbox */}
+      <motion.button
+        whileTap={{ scale: 0.8 }}
+        onClick={() => onToggle(task.id)}
+        style={{
+          width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+          border: `2.5px solid ${task.done ? (member?.barColor ?? '#10B981') : 'var(--border)'}`,
+          background: task.done ? (member?.barColor ?? '#10B981') : 'transparent',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transition: 'all 200ms',
+          boxShadow: task.done ? `0 2px 8px ${(member?.barColor ?? '#10B981')}40` : 'none',
+        }}
+      >
+        <AnimatePresence>
+          {task.done && (
+            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }} transition={spring}>
+              <Check size={13} color="#fff" strokeWidth={3} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.button>
+
+      {/* Emoji */}
+      <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0, filter: task.done ? 'grayscale(0.5)' : 'none' }}>
+        {task.emoji}
+      </span>
+
+      {/* Content */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 14, fontWeight: 600, color: task.done ? 'var(--text-3)' : 'var(--text-1)', textDecoration: task.done ? 'line-through' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: task.notes || task.dueDate ? 3 : 0 }}>
+          {task.title}
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {/* Priority pill */}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: p.color, background: p.bg, padding: '2px 8px', borderRadius: 20 }}>
+            <Flag size={9} strokeWidth={2.5} fill={p.color} /> {p.label}
+          </span>
+          {task.type === 'fixed' && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: 'var(--text-3)', background: 'var(--bg)', padding: '2px 8px', borderRadius: 20, border: '1px solid var(--border)' }}>
+              <Repeat2 size={9} /> Daily
+            </span>
+          )}
+          {task.dueDate && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-3)' }}>
+              <CalendarDays size={10} /> {task.dueDate}
+            </span>
+          )}
+          {task.notes && (
+            <span style={{ fontSize: 11, color: 'var(--text-3)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              · {task.notes}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Delete — only shows on hover */}
+      <AnimatePresence>
+        {hovered && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.12 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => onRemove(task.id)}
+            style={{ width: 30, height: 30, borderRadius: 8, border: 'none', background: '#FEF2F2', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#EF4444', flexShrink: 0 }}
+          >
+            <Trash2 size={14} />
+          </motion.button>
+        )}
+      </AnimatePresence>
+    </motion.div>
   )
 }
