@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
+import { useCalendarPrefs } from '@/hooks/useCalendarPrefs'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   User, Users, Palette, Bell, Trophy, CalendarDays,
@@ -79,6 +80,14 @@ interface SettingsViewProps {
 export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
   const [active, setActive] = useState<SectionId>('profile')
   const { members, addMember, updateMember, removeMember, uploadPhoto } = useMembersStore()
+  const { prefs: calPrefs, update: updateCalPrefs } = useCalendarPrefs()
+
+  // Auto-save calendar prefs with feedback
+  const saveCalPref = useCallback((patch: Parameters<typeof updateCalPrefs>[0]) => {
+    updateCalPrefs(patch)
+    toast.success('Guardado ✅', { duration:1500,
+      style:{ borderRadius:12, fontFamily:'var(--font-body)', fontWeight:600, fontSize:13 } })
+  }, [updateCalPrefs])
 
   // Profile
   const [profileForm, setProfileForm] = useState({ name: settings.familyName || '', phone:'', timezone:'America/New_York', language:'es', dateFormat:'MM/DD/YYYY', timeFormat:'12h' })
@@ -551,31 +560,88 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
       <div>
         <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>📅 Calendario</h1>
 
+        {/* Live preview badge */}
+        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 16px', borderRadius:12, background:'rgba(0,122,255,0.08)', border:'1px solid rgba(0,122,255,0.20)', marginBottom:16 }}>
+          <span style={{ fontSize:18 }}>✨</span>
+          <p style={{ fontSize:13, fontWeight:600, color:'var(--blue)', fontFamily:'var(--font-body)' }}>
+            Los cambios se guardan automáticamente — no necesitas botón de guardar
+          </p>
+        </div>
+
         <SectionCard>
+          {/* Vista por defecto */}
           <div className="settings-row">
-            <span className="font-semibold text-sm">Vista por defecto</span>
-            <select className="input-apple" style={{ width:'auto', padding:'8px 12px' }}>
-              <option>Semana</option><option>Día</option><option>Mes</option><option>Agenda</option>
-            </select>
+            <div>
+              <p className="font-bold text-sm">Vista por defecto</p>
+              <p className="text-xs mt-0.5" style={{ color:'var(--text-3)' }}>
+                Actualmente: <strong style={{ color:'var(--blue)' }}>
+                  {calPrefs.defaultView === 'week' ? 'Semana' : calPrefs.defaultView === 'day' ? 'Día' : calPrefs.defaultView === 'month' ? 'Mes' : 'Agenda'}
+                </strong>
+              </p>
+            </div>
+            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+              {[{v:'week',l:'Semana'},{v:'day',l:'Día'},{v:'month',l:'Mes'},{v:'agenda',l:'Agenda'}].map(opt=>(
+                <motion.button key={opt.v} whileTap={{scale:0.93}}
+                  onClick={() => saveCalPref({ defaultView: opt.v as any })}
+                  style={{
+                    padding:'7px 16px', borderRadius:99,
+                    border:`2px solid ${calPrefs.defaultView===opt.v?'var(--blue)':'rgba(0,0,0,0.08)'}`,
+                    background: calPrefs.defaultView===opt.v?'rgba(0,122,255,0.10)':'rgba(255,255,255,0.80)',
+                    color: calPrefs.defaultView===opt.v?'var(--blue)':'var(--text-2)',
+                    fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)',
+                    boxShadow: calPrefs.defaultView===opt.v?'0 2px 8px rgba(0,122,255,0.20)':'none',
+                    transition:'all 0.15s',
+                  }}>
+                  {opt.l}
+                </motion.button>
+              ))}
+            </div>
           </div>
+
+          {/* Show tasks */}
           <div className="settings-row">
             <div>
               <p className="font-bold text-sm">Mostrar tasks en calendario</p>
               <p className="text-xs" style={{ color:'var(--text-3)' }}>Tasks con hora aparecen en su slot</p>
             </div>
-            <Toggle value={true} onChange={() => {}} />
+            <Toggle value={calPrefs.showTasks} onChange={v => saveCalPref({ showTasks: v })} />
           </div>
+
+          {/* Week starts on */}
           <div className="settings-row">
-            <span className="font-semibold text-sm">La semana empieza en</span>
-            <div className="flex gap-2">
-              {['Domingo','Lunes'].map(d=>(
-                <button key={d} className="pill pill-default">{d}</button>
+            <div>
+              <p className="font-bold text-sm">La semana empieza en</p>
+              <p className="text-xs mt-0.5" style={{ color:'var(--text-3)' }}>
+                Actualmente: <strong style={{ color:'var(--blue)' }}>
+                  {calPrefs.weekStartsOn === 'monday' ? 'Lunes' : 'Domingo'}
+                </strong>
+              </p>
+            </div>
+            <div style={{ display:'flex', gap:6 }}>
+              {[{v:'monday',l:'Lunes'},{v:'sunday',l:'Domingo'}].map(opt=>(
+                <motion.button key={opt.v} whileTap={{scale:0.93}}
+                  onClick={() => saveCalPref({ weekStartsOn: opt.v as any })}
+                  style={{
+                    padding:'7px 16px', borderRadius:99,
+                    border:`2px solid ${calPrefs.weekStartsOn===opt.v?'var(--blue)':'rgba(0,0,0,0.08)'}`,
+                    background: calPrefs.weekStartsOn===opt.v?'rgba(0,122,255,0.10)':'rgba(255,255,255,0.80)',
+                    color: calPrefs.weekStartsOn===opt.v?'var(--blue)':'var(--text-2)',
+                    fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)',
+                    transition:'all 0.15s',
+                  }}>
+                  {opt.l}
+                </motion.button>
               ))}
             </div>
           </div>
+
+          {/* Show weekends */}
           <div className="settings-row">
-            <span className="font-semibold text-sm">Mostrar fines de semana</span>
-            <Toggle value={true} onChange={() => {}} />
+            <div>
+              <p className="font-bold text-sm">Mostrar fines de semana</p>
+              <p className="text-xs" style={{ color:'var(--text-3)' }}>Sábado y domingo visibles en la vista semanal</p>
+            </div>
+            <Toggle value={calPrefs.showWeekends} onChange={v => saveCalPref({ showWeekends: v })} />
           </div>
         </SectionCard>
 

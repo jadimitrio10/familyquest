@@ -3,6 +3,7 @@ import { usePointsStore } from '@/hooks/usePointsStore'
 import { CelebrationOverlay } from '@/components/shared/CelebrationOverlay'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, Trash2 } from 'lucide-react'
+import type { CalendarPrefs } from '@/hooks/useCalendarPrefs'
 import { CalendarTopBar } from './CalendarTopBar'
 import { MemberChip } from './MemberChip'
 import { AddEventModal } from './AddEventModal'
@@ -206,7 +207,7 @@ function toRichMembers(members: Member[]): RichMember[] {
 const DAY_LABELS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
 
 // ══════════════════════════════════════════════════════════
-export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
+export function CalendarView({ members: rawMembers, calPrefs }: { members?: Member[]; calPrefs?: CalendarPrefs }) {
   const [activeMember, setActiveMember]   = useState<string|null>(null)
   const [showAdd, setShowAdd]             = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent|null>(null)
@@ -301,8 +302,19 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
     : -1
 
   const nextLabel = `${format(addDays(weekStart,7),'MMM d')}–${format(addDays(weekStart,13),'MMM d')}`
-  const row1 = weekDays.slice(0,4)
-  const row2 = weekDays.slice(4,7)
+
+  // Apply showWeekends preference: if disabled, hide Sat(5) and Sun(6)
+  const showWeekends = calPrefs?.showWeekends !== false
+  const visibleDays  = showWeekends ? weekDays : weekDays.filter(d => {
+    const jsDay = new Date(d.date + 'T12:00:00').getDay()
+    return jsDay !== 0 && jsDay !== 6   // hide Sun(0) and Sat(6)
+  })
+
+  // Layout: up to 4 days per row
+  const row1 = visibleDays.slice(0, 4)
+  const row2 = visibleDays.slice(4, showWeekends ? 7 : visibleDays.length)
+  const gridCols1 = `80px repeat(${row1.length}, 1fr)`
+  const gridCols2 = `80px repeat(${row2.length}, 1fr)${showWeekends ? '' : ''}`
 
   return (
     <div style={{ display:'flex', flexDirection:'column', flex:1, overflow:'hidden', background:'var(--bg)' }}>
@@ -329,16 +341,14 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
             style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', background:'#fff', borderRadius:'14px 14px 0 0', border:'1px solid #EEE8E0', borderBottom:'none' }}
           >
             {/* ── Day headers ── */}
-            <div style={{ display:'grid', gridTemplateColumns:`80px repeat(4,1fr)`, borderBottom:'1px solid #EEE8E0' }}>
-              <div style={{ padding:'12px 8px' }} /> {/* time gutter */}
-              {row1.map(day => (
-                <DayHeader key={day.date} day={day} />
-              ))}
+            <div style={{ display:'grid', gridTemplateColumns:gridCols1, borderBottom:'1px solid #EEE8E0' }}>
+              <div style={{ padding:'12px 8px' }} />
+              {row1.map(day => <DayHeader key={day.date} day={day} />)}
             </div>
 
-            {/* ── ROW 1: Time grid Mon–Jue ── */}
+            {/* ── ROW 1: Time grid ── */}
             <div style={{ flex:1, overflowY:'auto', position:'relative' }}>
-              <div style={{ display:'grid', gridTemplateColumns:`80px repeat(4,1fr)`, height: HOURS.length*HOUR_H, position:'relative' }}>
+              <div style={{ display:'grid', gridTemplateColumns:gridCols1, height: HOURS.length*HOUR_H, position:'relative' }}>
                 {/* Current time line */}
                 {currentTimeY >= 0 && (
                   <div style={{ position:'absolute', left:80, right:0, top:currentTimeY, height:2, background:'#F87171', zIndex:20, pointerEvents:'none' }}>
@@ -356,28 +366,34 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
                 ))}
               </div>
 
-              {/* ── ROW 2 header: Vie–Dom + Next Week ── */}
-              <div style={{ display:'grid', gridTemplateColumns:`80px repeat(4,1fr)`, borderTop:'2px solid #EEE8E0', borderBottom:'1px solid #EEE8E0', background:'var(--bg)' }}>
-                <div style={{ padding:'12px 8px' }} />
-                {row2.map(day => <DayHeader key={day.date} day={day} />)}
-                {/* Next week header placeholder */}
-                <div style={{ padding:'12px 8px' }}>
-                  <span style={{ fontSize:11, fontWeight:600, color:'#A0AEC0', textTransform:'uppercase', letterSpacing:'0.06em', fontFamily:'var(--font-body)' }}>Next</span>
+              {/* ── ROW 2 header ── */}
+              {row2.length > 0 && (
+                <div style={{ display:'grid', gridTemplateColumns:`80px repeat(${row2.length},1fr)${showWeekends?' 1fr':''}`, borderTop:'2px solid #EEE8E0', borderBottom:'1px solid #EEE8E0', background:'var(--bg)' }}>
+                  <div style={{ padding:'12px 8px' }} />
+                  {row2.map(day => <DayHeader key={day.date} day={day} />)}
+                  {showWeekends && (
+                    <div style={{ padding:'12px 8px' }}>
+                      <span style={{ fontSize:11, fontWeight:600, color:'#A0AEC0', textTransform:'uppercase', letterSpacing:'0.06em', fontFamily:'var(--font-body)' }}>Next</span>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
 
-              {/* ── ROW 2 body: Vie–Dom + Next Week ── */}
-              <div style={{ display:'grid', gridTemplateColumns:`80px repeat(4,1fr)`, height:HOURS.length*HOUR_H*0.7, position:'relative' }}>
-                <TimeAxis compact />
-                {row2.map((day,i) => (
-                  <TimeColumn key={day.date} events={eventsForDay(day.date)} members={MEMBERS}
-                    onToggle={handleToggle} onEventClick={setSelectedEvent} colIndex={i+4} compact />
-                ))}
-                {/* Next Week column */}
-                <div style={{ borderLeft:'1px solid #EEE8E0', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:16, background:'#FAFAFA' }}>
-                  <NextWeekColumn dateRange={nextLabel} onGoNext={() => setWeekOffset(o=>o+1)} />
+              {/* ── ROW 2 body ── */}
+              {row2.length > 0 && (
+                <div style={{ display:'grid', gridTemplateColumns:`80px repeat(${row2.length},1fr)${showWeekends?' 1fr':''}`, height:HOURS.length*HOUR_H*0.7, position:'relative' }}>
+                  <TimeAxis compact />
+                  {row2.map((day,i) => (
+                    <TimeColumn key={day.date} events={eventsForDay(day.date)} members={MEMBERS}
+                      onToggle={handleToggle} onEventClick={setSelectedEvent} colIndex={i+4} compact />
+                  ))}
+                  {showWeekends && (
+                    <div style={{ borderLeft:'1px solid #EEE8E0', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:16, background:'#FAFAFA' }}>
+                      <NextWeekColumn dateRange={nextLabel} onGoNext={() => setWeekOffset(o=>o+1)} />
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
           </motion.div>
         </AnimatePresence>

@@ -12,6 +12,7 @@ import { SleepView } from '@/views/SleepView'
 import { SettingsView } from '@/views/SettingsView'
 import { useAppSettings } from '@/hooks/useAppStore'
 import { useMembersStore } from '@/hooks/useMembersStore'
+import { useCalendarPrefs } from '@/hooks/useCalendarPrefs'
 import { MemberAvatar } from '@/components/shared/MemberAvatar'
 import type { ViewId } from '@/types/app.types'
 
@@ -30,6 +31,7 @@ export default function App() {
   const [hovered, setHovered] = useState<string | null>(null)
   const { settings, update } = useAppSettings()
   const { members } = useMembersStore()
+  const { prefs: calPrefs } = useCalendarPrefs()
   const weather = useWeather()
   const [clockTime, setClockTime] = useState('')
 
@@ -185,7 +187,7 @@ export default function App() {
             transition={{ duration:0.16, ease:'easeInOut' }}
             style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}
           >
-            {activeView === 'calendar'  && <CalendarView members={members} />}
+            {activeView === 'calendar'  && <CalendarView members={members} calPrefs={calPrefs} />}
             {activeView === 'tasks'     && <TasksView />}
             {activeView === 'rewards'   && <RewardsView />}
             {activeView === 'meals'     && <MealsView />}
