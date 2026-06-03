@@ -7,6 +7,7 @@ import {
 import { useMembersStore } from '@/hooks/useMembersStore'
 import { MemberAvatar } from '@/components/shared/MemberAvatar'
 import { EmojiPicker } from '@/components/shared/EmojiPicker'
+import { useT } from '@/lib/i18n'
 
 // ─── Types ────────────────────────────────────────────────
 export interface Task {
@@ -109,6 +110,7 @@ export function TasksView() {
     return () => document.removeEventListener('mousedown', h)
   }, [])
 
+  const { t } = useT()
   const memberId = activeMember || members[0]?.id || ''
   const member   = members.find(m => m.id === memberId)
   const accent   = member?.barColor ?? '#FF6B8A'
@@ -354,7 +356,7 @@ export function TasksView() {
             style={{ flexShrink: 0, fontSize: 14 }}
           >
             <Sparkles size={15} />
-            Add Task
+            {t('tasks.addTask')}
           </motion.button>
         </div>
 
@@ -362,7 +364,7 @@ export function TasksView() {
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
 
           <AppleSection
-            icon="🔄" title="Fixed Tasks" subtitle="Se repiten todos los días"
+            icon="🔄" title={t('tasks.fixedTasks')} subtitle={t('tasks.fixedSub')}
             count={fixedP.length} accent="#5856D6"
             expanded={expanded.fixed} onToggle={() => toggleSec('fixed')}
             extra={
@@ -373,20 +375,20 @@ export function TasksView() {
             }
           >
             {fixedP.map((task, i) => <AppleTaskCard key={task.id} task={task} member={member} onToggle={toggle} onRemove={remove} delay={i * 0.04} onEdit={openEdit} />)}
-            {fixedP.length === 0 && <AppleEmptySection emoji="🔄" text="Sin tasks fijos" sub="Agrega tareas que se repiten diario" onAdd={() => setFlow('choose')} />}
+            {fixedP.length === 0 && <AppleEmptySection emoji="🔄" text={t('tasks.noFixed')} sub={t('tasks.addFirst')} onAdd={() => setFlow('choose')} />}
           </AppleSection>
 
           <AppleSection
-            icon="📅" title="One-time Tasks" subtitle="Tareas específicas"
+            icon="📅" title={t('tasks.onceTasks')} subtitle={t('tasks.onceSub')}
             count={onceP.length} accent="#FF9500"
             expanded={expanded.once} onToggle={() => toggleSec('once')}
           >
             {onceP.map((task, i) => <AppleTaskCard key={task.id} task={task} member={member} onToggle={toggle} onRemove={remove} delay={i * 0.04} onEdit={openEdit} />)}
-            {onceP.length === 0 && <AppleEmptySection emoji="📅" text="Sin tasks pendientes" sub="Agrega tareas para este miembro" onAdd={() => setFlow('choose')} />}
+            {onceP.length === 0 && <AppleEmptySection emoji="📅" text={t('tasks.noPending')} sub={t('tasks.addFirst')} onAdd={() => setFlow('choose')} />}
           </AppleSection>
 
           <AppleSection
-            icon="✅" title="Completados" count={doneT.length}
+            icon="✅" title={t('tasks.completed')} count={doneT.length}
             accent="#34C759" expanded={expanded.done} onToggle={() => toggleSec('done')} dimmed
           >
             {doneT.map((task, i) => <AppleTaskCard key={task.id} task={task} member={member} onToggle={toggle} onRemove={remove} delay={i * 0.03} dimmed onEdit={openEdit} />)}

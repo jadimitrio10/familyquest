@@ -4,6 +4,7 @@ import { CelebrationOverlay } from '@/components/shared/CelebrationOverlay'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, Trash2 } from 'lucide-react'
 import type { CalendarPrefs } from '@/hooks/useCalendarPrefs'
+import { useT, T } from '@/lib/i18n'
 import { CalendarTopBar } from './CalendarTopBar'
 import { MemberChip } from './MemberChip'
 import { AddEventModal } from './AddEventModal'
@@ -204,7 +205,7 @@ function toRichMembers(members: Member[]): RichMember[] {
   }))
 }
 
-const DAY_LABELS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+// Day labels are computed dynamically inside the component using useT()
 
 // ══════════════════════════════════════════════════════════
 export function CalendarView({ members: rawMembers, calPrefs }: { members?: Member[]; calPrefs?: CalendarPrefs }) {
@@ -234,6 +235,8 @@ export function CalendarView({ members: rawMembers, calPrefs }: { members?: Memb
   const { events:calEvents, toggleEvent, addEvent, deleteEvent, updateEvent } = useCalendarStore()
   const { awardPoints, removePoints } = usePointsStore()
   const MEMBERS = useMemo(() => rawMembers ? toRichMembers(rawMembers) : [], [rawMembers])
+  const { t, lang } = useT()
+  const DAY_LABELS = [...T.cal.days.short[lang]] as string[]
 
   const weekStart  = addDays(getMondayOfWeek(new Date()), weekOffset * 7)
   const weekDays   = DAY_LABELS.map((label, i) => {

@@ -15,15 +15,16 @@ import { useMembersStore } from '@/hooks/useMembersStore'
 import { useCalendarPrefs } from '@/hooks/useCalendarPrefs'
 import { MemberAvatar } from '@/components/shared/MemberAvatar'
 import type { ViewId } from '@/types/app.types'
+import { useT } from '@/lib/i18n'
 
-const NAV: { id: ViewId; icon: React.ElementType; label: string }[] = [
-  { id:'calendar', icon:Calendar,        label:'Calendar'  },
-  { id:'tasks',    icon:CheckSquare,     label:'Tasks'     },
-  { id:'rewards',  icon:Star,            label:'Rewards'   },
-  { id:'meals',    icon:UtensilsCrossed, label:'Meals'     },
-  { id:'photos',   icon:Image,           label:'Photos'    },
-  { id:'sleep',    icon:Moon,            label:'Sleep'     },
-  { id:'settings', icon:Settings,        label:'Settings'  },
+const NAV_IDS: { id: ViewId; icon: React.ElementType }[] = [
+  { id:'calendar', icon:Calendar        },
+  { id:'tasks',    icon:CheckSquare     },
+  { id:'rewards',  icon:Star            },
+  { id:'meals',    icon:UtensilsCrossed },
+  { id:'photos',   icon:Image           },
+  { id:'sleep',    icon:Moon            },
+  { id:'settings', icon:Settings        },
 ]
 
 export default function App() {
@@ -34,6 +35,9 @@ export default function App() {
   const { prefs: calPrefs } = useCalendarPrefs()
   const weather = useWeather()
   const [clockTime, setClockTime] = useState('')
+  const { t } = useT()
+
+  const NAV = NAV_IDS.map(n => ({ ...n, label: t(`nav.${n.id}`) }))
 
   // Live clock
   useEffect(() => {

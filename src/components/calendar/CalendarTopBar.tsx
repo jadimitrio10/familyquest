@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion'
-import { ChevronLeft, ChevronRight, SlidersHorizontal, Plus, PenLine } from 'lucide-react'
+import { ChevronLeft, ChevronRight, SlidersHorizontal, Plus } from 'lucide-react'
 import { format } from 'date-fns'
 import { useWeather } from '@/hooks/useWeather'
 import { useMembersStore } from '@/hooks/useMembersStore'
+import { useT } from '@/lib/i18n'
 import { MemberAvatar } from '@/components/shared/MemberAvatar'
 import { useAppSettings } from '@/hooks/useAppStore'
 import type { FamilyEvent } from './CalendarView'
@@ -26,6 +27,7 @@ export function CalendarTopBar({
   const weather       = useWeather()
   const { members }   = useMembersStore()
   const { settings }  = useAppSettings()
+  const { t }         = useT()
   const now           = new Date()
   const timeStr       = format(now, 'h:mm aa')
   const rangeStr      = `${format(weekStart,'MMM d')}–${format(weekEnd,'d')}`
@@ -84,7 +86,7 @@ export function CalendarTopBar({
         {/* + Add Event */}
         <motion.button onClick={onAddEvent} whileHover={{ scale:1.03, y:-1 }} whileTap={{ scale:0.97 }}
           style={{ display:'flex', alignItems:'center', gap:7, padding:'9px 20px', background:'linear-gradient(135deg,#E07B8A,#D45C6B)', color:'#fff', border:'none', borderRadius:100, fontSize:13, fontWeight:700, fontFamily:'var(--font-heading)', cursor:'pointer', boxShadow:'0 4px 14px rgba(224,123,138,0.35)' }}>
-          <Plus size={14} strokeWidth={2.5} /> Add Event
+          <Plus size={14} strokeWidth={2.5} /> {t('cal.addEvent')}
         </motion.button>
       </div>
 

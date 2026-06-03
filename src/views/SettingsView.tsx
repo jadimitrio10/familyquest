@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
+import { useT } from '@/lib/i18n'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   User, Users, Palette, Bell, Trophy, CalendarDays,
@@ -80,16 +81,16 @@ const COLOR_OPTIONS = [
 
 type SectionId = 'profile'|'family'|'appearance'|'notifications'|'gamification'|'calendar'|'security'|'subscription'|'about'
 
-const SECTIONS: { id: SectionId; emoji: string; label: string; iconBg: string }[] = [
-  { id:'profile',       emoji:'👤', label:'Perfil',          iconBg:'#007AFF' },
-  { id:'family',        emoji:'👨‍👩‍👧', label:'Familia',         iconBg:'#FF9500' },
-  { id:'appearance',    emoji:'🎨', label:'Apariencia',      iconBg:'#AF52DE' },
-  { id:'notifications', emoji:'🔔', label:'Notificaciones',  iconBg:'#FF3B30' },
-  { id:'gamification',  emoji:'🏆', label:'Gamificación',    iconBg:'#FFCC00' },
-  { id:'calendar',      emoji:'📅', label:'Calendario',      iconBg:'#34C759' },
-  { id:'security',      emoji:'🔒', label:'Seguridad',       iconBg:'#636366' },
-  { id:'subscription',  emoji:'💳', label:'Plan',            iconBg:'#5AC8FA' },
-  { id:'about',         emoji:'ℹ️', label:'Acerca de',       iconBg:'#8E8E93' },
+const SECTION_META: { id: SectionId; emoji: string; labelKey: string; iconBg: string }[] = [
+  { id:'profile',       emoji:'👤', labelKey:'settings.profile',       iconBg:'#007AFF' },
+  { id:'family',        emoji:'👨‍👩‍👧', labelKey:'settings.family',        iconBg:'#FF9500' },
+  { id:'appearance',    emoji:'🎨', labelKey:'settings.appearance',    iconBg:'#AF52DE' },
+  { id:'notifications', emoji:'🔔', labelKey:'settings.notifications', iconBg:'#FF3B30' },
+  { id:'gamification',  emoji:'🏆', labelKey:'settings.gamification',  iconBg:'#FFCC00' },
+  { id:'calendar',      emoji:'📅', labelKey:'settings.calendar',      iconBg:'#34C759' },
+  { id:'security',      emoji:'🔒', labelKey:'settings.security',      iconBg:'#636366' },
+  { id:'subscription',  emoji:'💳', labelKey:'settings.plan',          iconBg:'#5AC8FA' },
+  { id:'about',         emoji:'ℹ️', labelKey:'settings.about',         iconBg:'#8E8E93' },
 ]
 
 // ─── Props ────────────────────────────────────────────────────────────────
@@ -103,6 +104,8 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
   const [active, setActive]   = useState<SectionId>('profile')
   const { members, addMember, updateMember, removeMember, uploadPhoto } = useMembersStore()
   const { prefs: calPrefs, update: updateCalPrefs } = useCalendarPrefs()
+  const { t } = useT()
+  const SECTIONS = SECTION_META.map(s => ({ ...s, label: t(s.labelKey) }))
 
   // Profile form — local state
   const [profileName, setProfileName] = useState(settings.familyName || '')
@@ -130,9 +133,13 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
   const [twoFA, setTwoFA]       = useState(false)
   const [deleteWord, setDeleteWord] = useState('')
 
-  const saved = useCallback(() =>
-    toast.success('Guardado', { duration:1500, icon:'✅',
-      style:{ borderRadius:12, fontFamily:'var(--font-body)', fontWeight:600, fontSize:13 } }), [])
+  const saved = useCallback(() => {
+    // get fresh lang from localStorage to avoid stale closure
+    const lang = (() => { try { const s=JSON.parse(localStorage.getItem('fq_settings')||'{}'); return s.language||'es' } catch { return 'es' } })()
+    const msg = lang==='en'?'Saved':lang==='fr'?'Enregistré':'Guardado'
+    toast.success(msg, { duration:1500, icon:'✅',
+      style:{ borderRadius:12, fontFamily:'var(--font-body)', fontWeight:600, fontSize:13 } })
+  }, [])
 
   const savePref = useCallback(<K extends keyof AppSettings>(key: K, val: AppSettings[K]) => {
     onUpdate({ [key]: val } as Partial<AppSettings>); saved()
@@ -173,7 +180,7 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
     // ── PROFILE ────────────────────────────────────────────────────────────
     case 'profile': return (
       <div>
-        <SectionTitle>Perfil</SectionTitle>
+        <SectionTitle>{t('settings.profile')}</SectionTitle>
 
         {/* Avatar */}
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', marginBottom:28 }}>
@@ -190,8 +197,8 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
           <p style={{ fontSize:13, color:'#8E8E93' }}>Administrador</p>
         </div>
 
-        <SettingsGroup label="Información personal">
-          <SettingsRow icon={<User size={16} color="#fff" />} iconBg="#007AFF" label="Nombre">
+        <SettingsGroup label={t('settings.profile')}>
+          <SettingsRow icon={<User size={16} color="#fff" />} iconBg="#007AFF" label={t('settings.name')}>
             <input value={profileName} onChange={e => setProfileName(e.target.value)}
               onBlur={() => { onUpdate({ familyName: profileName }); saved() }}
               placeholder="Tu nombre"
@@ -663,7 +670,7 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
       {/* Sidebar */}
       <div style={{ width:240, background:'#F2F2F7', borderRight:'1px solid rgba(0,0,0,0.06)', display:'flex', flexDirection:'column', overflow:'hidden', flexShrink:0 }}>
         <div style={{ padding:'20px 16px 10px' }}>
-          <p style={{ fontSize:22, fontWeight:900, color:'#1C1C1E', fontFamily:'var(--font-heading)' }}>Ajustes</p>
+          <p style={{ fontSize:22, fontWeight:900, color:'#1C1C1E', fontFamily:'var(--font-heading)' }}>{t('settings.title')}</p>
         </div>
         <div style={{ flex:1, overflowY:'auto', padding:'0 10px 16px' }}>
           {SECTIONS.map(s => (
