@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { usePointsStore } from '@/hooks/usePointsStore'
+import { CelebrationOverlay } from '@/components/shared/CelebrationOverlay'
 import toast from 'react-hot-toast'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus } from 'lucide-react'
@@ -146,6 +147,13 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
   const [weekOffset, setWeekOffset]       = useState(0)
   const [tick, setTick]                   = useState(0)
 
+  // Celebration state
+  const [celebration, setCelebration] = useState<{
+    memberName: string; memberEmoji: string; memberColor: string
+    memberAccent: string; memberPhoto?: string
+    points: number; taskTitle: string; taskEmoji: string
+  } | null>(null)
+
   useEffect(() => {
     const id = setInterval(() => setTick(n => n+1), 2000)
     return () => clearInterval(id)
@@ -184,16 +192,29 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
       try {
         const tasks = JSON.parse(localStorage.getItem(TASKS_KEY) ?? '[]')
         const task = tasks.find((t: any) => t.id === taskId)
-        if (task && task.points > 0) {
+        if (task) {
           const txId = `tx-${rest}`
           if (nowCompleted) {
-            awardPoints(task.memberId, task.points, task.title, task.emoji || '⭐', txId)
-            toast.success(`+${task.points} ⭐ para ${MEMBERS.find(m=>m.id===task.memberId)?.name ?? ''}!`, {
-              duration: 2000,
-              style: { background:'#FFFBEB', color:'#92400E', fontFamily:'var(--font-heading)', fontWeight:700, borderRadius:14 },
-            })
+            // Award points
+            if (task.points > 0) {
+              awardPoints(task.memberId, task.points, task.title, task.emoji || '⭐', txId)
+            }
+            // Show celebration overlay!
+            const member = MEMBERS.find(m => m.id === task.memberId)
+            if (member) {
+              setCelebration({
+                memberName:   member.name,
+                memberEmoji:  member.emoji || member.avatar || '👤',
+                memberColor:  member.bgColor,
+                memberAccent: member.barColor,
+                memberPhoto:  member.photoDataUrl,
+                points:       task.points || 0,
+                taskTitle:    task.title,
+                taskEmoji:    task.emoji || '✅',
+              })
+            }
           } else {
-            removePoints(task.memberId, task.points, txId)
+            if (task.points > 0) removePoints(task.memberId, task.points, txId)
           }
         }
       } catch {}
@@ -299,6 +320,20 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
       <EventDetailModal event={selectedEvent} onClose={() => setSelectedEvent(null)}
         onDelete={(id) => { deleteEvent(id); setSelectedEvent(null) }}
         onUpdate={updateEvent} onToggle={handleToggle} />
+
+      {/* 🎉 Celebration overlay — shows when task is completed */}
+      <CelebrationOverlay
+        show={!!celebration}
+        memberName={celebration?.memberName ?? ''}
+        memberEmoji={celebration?.memberEmoji ?? '👤'}
+        memberColor={celebration?.memberColor ?? '#FFE4E6'}
+        memberAccent={celebration?.memberAccent ?? '#FB7185'}
+        memberPhoto={celebration?.memberPhoto}
+        points={celebration?.points ?? 0}
+        taskTitle={celebration?.taskTitle ?? ''}
+        taskEmoji={celebration?.taskEmoji ?? '✅'}
+        onDone={() => setCelebration(null)}
+      />
     </div>
   )
 }
