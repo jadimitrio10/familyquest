@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useWeather } from '@/hooks/useWeather'
+import { FamilySetup } from '@/components/shared/FamilySetup'
+import { useAutoSync } from '@/hooks/useAutoSync'
+import { FAMILY_ID_KEY } from '@/lib/sync'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Calendar, CheckSquare, Star, UtensilsCrossed, Image, Moon, Settings, CloudSun } from 'lucide-react'
 import { Toaster } from 'react-hot-toast'
@@ -29,15 +32,30 @@ const NAV_IDS: { id: ViewId; icon: React.ElementType }[] = [
 
 export default function App() {
   const [activeView, setActiveView] = useState<ViewId>('calendar')
-  const [hovered, setHovered] = useState<string | null>(null)
+  const [hovered, setHovered]       = useState<string | null>(null)
+  const [connected, setConnected]   = useState<boolean>(() => !!localStorage.getItem(FAMILY_ID_KEY))
   const { settings, update } = useAppSettings()
   const { members } = useMembersStore()
   const { prefs: calPrefs } = useCalendarPrefs()
   const weather = useWeather()
   const [clockTime, setClockTime] = useState('')
   const { t } = useT()
+  useAutoSync()
 
   const NAV = NAV_IDS.map(n => ({ ...n, label: t(`nav.${n.id}`) }))
+
+  // Show family setup screen if not connected to Supabase
+  if (!connected) {
+    return (
+      <>
+        <Toaster />
+        <FamilySetup
+          existingFamilyName={settings.familyName}
+          onConnected={() => setConnected(true)}
+        />
+      </>
+    )
+  }
 
   // Live clock
   useEffect(() => {
