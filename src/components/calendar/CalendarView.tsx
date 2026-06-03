@@ -214,8 +214,15 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', flex:1, overflow:'hidden', background:'var(--bg)' }}>
-      <CalendarTopBar weekStart={weekStart} weekEnd={addDays(weekStart,6)}
-        onAddEvent={() => setShowAdd(true)} onPrev={() => setWeekOffset(o=>o-1)} onNext={() => setWeekOffset(o=>o+1)} />
+      <CalendarTopBar
+        weekStart={weekStart}
+        weekEnd={addDays(weekStart,6)}
+        onAddEvent={() => setShowAdd(true)}
+        onPrev={() => setWeekOffset(o => o-1)}
+        onNext={() => setWeekOffset(o => o+1)}
+        activeMember={activeMember}
+        onToggleMember={(id) => setActiveMember(prev => prev === id || id === '' ? null : id)}
+      />
 
       {/* Calendar body — time grid exactly like Stitch */}
       <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column', margin:'0 12px 0' }}>
