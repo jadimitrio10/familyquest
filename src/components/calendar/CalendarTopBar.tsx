@@ -1,10 +1,11 @@
 import { motion } from 'framer-motion'
-import { ChevronLeft, ChevronRight, SlidersHorizontal, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, SlidersHorizontal, Plus, PenLine } from 'lucide-react'
 import { format } from 'date-fns'
 import { useWeather } from '@/hooks/useWeather'
 import { useMembersStore } from '@/hooks/useMembersStore'
 import { MemberAvatar } from '@/components/shared/MemberAvatar'
 import { useAppSettings } from '@/hooks/useAppStore'
+import type { FamilyEvent } from './CalendarView'
 
 interface CalendarTopBarProps {
   weekStart: Date
@@ -12,14 +13,15 @@ interface CalendarTopBarProps {
   onAddEvent: () => void
   onPrev: () => void
   onNext: () => void
-  // Member filter — connected to CalendarView state
   activeMember: string | null
   onToggleMember: (id: string) => void
+  familyEvents?: FamilyEvent[]
+  onEditFamilyEvents?: () => void
 }
 
 export function CalendarTopBar({
   weekStart, weekEnd, onAddEvent, onPrev, onNext,
-  activeMember, onToggleMember,
+  activeMember, onToggleMember, familyEvents = [], onEditFamilyEvents,
 }: CalendarTopBarProps) {
   const weather       = useWeather()
   const { members }   = useMembersStore()
@@ -89,25 +91,69 @@ export function CalendarTopBar({
       {/* ── ROW 2: Member filter pills — CLICKABLE ── */}
       <div style={{ display:'flex', gap:8, alignItems:'center', padding:'0 28px 14px', flexWrap:'wrap' }}>
 
-        {/* "All" pill — clears filter */}
-        <motion.button
-          onClick={() => onToggleMember('')}
-          whileHover={{ scale:1.04, y:-1 }}
-          whileTap={{ scale:0.96 }}
-          style={{
-            display:'flex', alignItems:'center', gap:6,
-            background: activeMember === null ? '#1C1C1E' : '#fff',
-            border: activeMember === null ? 'none' : '1px solid #EEE8E0',
-            color: activeMember === null ? '#fff' : '#718096',
-            padding:'5px 14px', borderRadius:100, cursor:'pointer',
-            boxShadow:'0 1px 4px rgba(0,0,0,0.06)',
-            fontSize:12, fontWeight:700, fontFamily:'var(--font-body)',
-            transition:'all 0.15s',
-          }}
-        >
-          <span style={{ fontSize:13 }}>🏡</span>
-          {settings.familyName?.split(' ')[0] || 'Todos'}
-        </motion.button>
+        {/* Family pill + important events — click to edit */}
+        <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+          {/* "Show all" / Family name pill */}
+          <motion.button
+            onClick={() => onToggleMember('')}
+            whileHover={{ scale:1.03, y:-1 }}
+            whileTap={{ scale:0.96 }}
+            style={{
+              display:'flex', alignItems:'center', gap:6,
+              background: activeMember === null ? '#1C1C1E' : '#fff',
+              border: activeMember === null ? 'none' : '1px solid #EEE8E0',
+              color: activeMember === null ? '#fff' : '#718096',
+              padding:'5px 14px', borderRadius:100, cursor:'pointer',
+              boxShadow:'0 1px 4px rgba(0,0,0,0.06)',
+              fontSize:12, fontWeight:700, fontFamily:'var(--font-body)',
+            }}
+          >
+            <span style={{ fontSize:13 }}>🏡</span>
+            {settings.familyName?.split(' ')[0] || 'Todos'}
+          </motion.button>
+
+          {/* Family events strip — each event as a pill */}
+          {familyEvents.map(ev => (
+            <motion.button
+              key={ev.id}
+              whileHover={{ scale:1.04, y:-1 }}
+              whileTap={{ scale:0.96 }}
+              onClick={onEditFamilyEvents}
+              style={{
+                display:'flex', alignItems:'center', gap:5,
+                background: ev.color || '#F9D2D2',
+                border:'1px solid rgba(255,255,255,0.60)',
+                padding:'5px 12px', borderRadius:100,
+                cursor:'pointer',
+                boxShadow:'0 1px 4px rgba(0,0,0,0.07)',
+                fontSize:12, fontWeight:700, fontFamily:'var(--font-body)',
+                color:'#2D3748',
+              }}
+              title={`${ev.date}${ev.endDate ? ' → ' + ev.endDate : ''}`}
+            >
+              <span>{ev.emoji}</span>
+              <span>{ev.title}</span>
+            </motion.button>
+          ))}
+
+          {/* Add / edit events button */}
+          <motion.button
+            whileHover={{ scale:1.06 }}
+            whileTap={{ scale:0.94 }}
+            onClick={onEditFamilyEvents}
+            style={{
+              width:28, height:28, borderRadius:'50%',
+              border:'1.5px dashed #CBD5E0',
+              background:'rgba(255,255,255,0.80)',
+              cursor:'pointer',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              color:'#A0AEC0',
+            }}
+            title="Agregar evento familiar"
+          >
+            <Plus size={13} strokeWidth={2.5} />
+          </motion.button>
+        </div>
 
         {/* One pill per member — clicking filters the calendar */}
         {members.map(m => {

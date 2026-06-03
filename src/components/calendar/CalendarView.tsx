@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { usePointsStore } from '@/hooks/usePointsStore'
 import { CelebrationOverlay } from '@/components/shared/CelebrationOverlay'
-import toast from 'react-hot-toast'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus } from 'lucide-react'
+import { X, Plus, Trash2 } from 'lucide-react'
 import { CalendarTopBar } from './CalendarTopBar'
 import { MemberChip } from './MemberChip'
 import { AddEventModal } from './AddEventModal'
@@ -126,6 +125,73 @@ function timeToHeight(start: string, end: string): number {
   return Math.max((mins / 60) * HOUR_H, 32)
 }
 
+// ── Overlap layout — places simultaneous events side-by-side ──
+interface PositionedEvent {
+  event: CalendarEvent
+  col: number     // 0-based column index in this overlap group
+  totalCols: number
+}
+
+function layoutTimedEvents(events: CalendarEvent[]): PositionedEvent[] {
+  if (events.length === 0) return []
+
+  // Convert time to minutes for comparison
+  const toMins = (t: string) => { const [h,m]=t.split(':').map(Number); return h*60+m }
+
+  const sorted = [...events].sort((a,b) =>
+    toMins(a.startTime!) - toMins(b.startTime!)
+  )
+
+  const result: PositionedEvent[] = []
+  // Groups of overlapping events
+  const groups: CalendarEvent[][] = []
+
+  for (const ev of sorted) {
+    const start = toMins(ev.startTime!)
+    const end   = ev.endTime ? toMins(ev.endTime) : start + 60
+
+    // Find a group this event overlaps with
+    let placed = false
+    for (const group of groups) {
+      // Check if this event overlaps any event in the group
+      const overlaps = group.some(g => {
+        const gs = toMins(g.startTime!)
+        const ge = g.endTime ? toMins(g.endTime) : gs + 60
+        return start < ge && end > gs
+      })
+      if (overlaps) { group.push(ev); placed = true; break }
+    }
+    if (!placed) groups.push([ev])
+  }
+
+  // For each group, assign columns
+  for (const group of groups) {
+    const total = group.length
+    group.forEach((ev, idx) => {
+      result.push({ event: ev, col: idx, totalCols: total })
+    })
+  }
+
+  return result
+}
+
+// ── Family events storage ──
+const FAMILY_EVENTS_KEY = 'fq_family_events_v1'
+export interface FamilyEvent {
+  id: string
+  title: string
+  emoji: string
+  date: string       // 'YYYY-MM-DD'
+  endDate?: string
+  color?: string
+}
+function loadFamilyEvents(): FamilyEvent[] {
+  try { return JSON.parse(localStorage.getItem(FAMILY_EVENTS_KEY) ?? '[]') } catch { return [] }
+}
+function saveFamilyEvents(evs: FamilyEvent[]) {
+  try { localStorage.setItem(FAMILY_EVENTS_KEY, JSON.stringify(evs)) } catch {}
+}
+
 type RichMember = CalendarMember & { emoji:string; photoDataUrl?:string }
 
 function toRichMembers(members: Member[]): RichMember[] {
@@ -146,6 +212,11 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent|null>(null)
   const [weekOffset, setWeekOffset]       = useState(0)
   const [tick, setTick]                   = useState(0)
+
+  // Family events
+  const [familyEvents, setFamilyEvents] = useState<FamilyEvent[]>(loadFamilyEvents)
+  const [showFamilyModal, setShowFamilyModal] = useState(false)
+  useEffect(() => { saveFamilyEvents(familyEvents) }, [familyEvents])
 
   // Celebration state
   const [celebration, setCelebration] = useState<{
@@ -243,6 +314,8 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
         onNext={() => setWeekOffset(o => o+1)}
         activeMember={activeMember}
         onToggleMember={(id) => setActiveMember(prev => prev === id || id === '' ? null : id)}
+        familyEvents={familyEvents}
+        onEditFamilyEvents={() => setShowFamilyModal(true)}
       />
 
       {/* Calendar body — time grid exactly like Stitch */}
@@ -320,6 +393,16 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
       <EventDetailModal event={selectedEvent} onClose={() => setSelectedEvent(null)}
         onDelete={(id) => { deleteEvent(id); setSelectedEvent(null) }}
         onUpdate={updateEvent} onToggle={handleToggle} />
+
+      {/* 📌 Family Events Modal */}
+      {showFamilyModal && (
+        <FamilyEventsModal
+          events={familyEvents}
+          onAdd={(ev) => setFamilyEvents(prev => [...prev, ev])}
+          onRemove={(id) => setFamilyEvents(prev => prev.filter(e => e.id !== id))}
+          onClose={() => setShowFamilyModal(false)}
+        />
+      )}
 
       {/* 🎉 Celebration overlay — shows when task is completed */}
       <CelebrationOverlay
@@ -444,44 +527,54 @@ function TimeColumn({ events, members, onToggle, onEventClick, colIndex, compact
         })}
       </div>
 
-      {/* Timed events — absolutely positioned, color by title */}
-      {timedEvents.map(event => {
+      {/* Timed events — side-by-side when overlapping */}
+      {layoutTimedEvents(timedEvents).map(({ event, col, totalCols }) => {
         const member = members.find(m => m.id===event.memberId)
         if (!member || !event.startTime) return null
         const colors = colorForTitle(event.title)
         const bg    = colors.bg
         const textC = colors.text
         const barC  = colors.bar
-        const top  = timeToY(event.startTime) + (allDayEvents.length * 52)
-        const h    = event.endTime ? timeToHeight(event.startTime, event.endTime) : 60
+        const top   = timeToY(event.startTime) + (allDayEvents.length * 52)
+        const h     = event.endTime ? timeToHeight(event.startTime, event.endTime) : 60
+
+        // Side-by-side layout: divide width equally, add 2px gap
+        const gutter = 4
+        const colW  = `calc((100% - ${gutter * (totalCols + 1)}px) / ${totalCols})`
+        const leftPx = gutter + col * (gutter + 1) // approximate — use % below
 
         return (
           <motion.div key={event.id}
             onClick={() => onEventClick(event)}
             initial={{ opacity:0 }} animate={{ opacity:1 }}
             style={{
-              position:'absolute', left:4, right:4,
+              position:'absolute',
+              // Each event occupies 1/totalCols of the column width
+              left: `calc(${gutter}px + ${col} * (100% - ${gutter*2}px) / ${totalCols} + ${col > 0 ? 2 : 0}px)`,
+              width: `calc((100% - ${gutter * 2 + (totalCols - 1) * 2}px) / ${totalCols})`,
               top, height:h,
-              background:bg, borderRadius:14,
-              border:'1px solid rgba(255,255,255,0.65)',
-              boxShadow:'0 2px 8px rgba(0,0,0,0.07)',
-              padding:'10px 12px',
+              background:bg, borderRadius:12,
+              border: `2px solid rgba(255,255,255,0.80)`,
+              boxShadow: totalCols > 1
+                ? `0 2px 8px rgba(0,0,0,0.10), 0 0 0 1px ${barC}30`
+                : '0 2px 8px rgba(0,0,0,0.07)',
+              padding: totalCols > 1 ? '8px 8px' : '10px 12px',
               cursor:'pointer', overflow:'hidden',
               display:'flex', flexDirection:'column', justifyContent:'space-between',
             }}
-            whileHover={{ filter:'brightness(0.97)' }}
+            whileHover={{ filter:'brightness(0.95)', zIndex:10 }}
           >
-            <p style={{ fontWeight:700, fontSize:13, color:textC, fontFamily:'var(--font-heading)', lineHeight:1.2 }}>
-              {event.title}
+            <p style={{ fontWeight:700, fontSize: totalCols > 1 ? 11 : 13, color:textC, fontFamily:'var(--font-heading)', lineHeight:1.2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace: totalCols > 2 ? 'nowrap' : 'normal' }}>
+              {event.emoji && event.emoji !== '📅' ? `${event.emoji} ` : ''}{event.title}
             </p>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-              <p style={{ fontSize:11, fontWeight:500, color:textC, opacity:0.60, fontFamily:'var(--font-body)' }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:4 }}>
+              <p style={{ fontSize: totalCols > 1 ? 10 : 11, fontWeight:500, color:textC, opacity:0.60, fontFamily:'var(--font-body)' }}>
                 {event.startTime}{event.endTime ? ` - ${event.endTime}` : ''}
               </p>
               {member.photoDataUrl ? (
-                <img src={member.photoDataUrl} alt={member.name} style={{ width:20,height:20,borderRadius:'50%',objectFit:'cover',border:'2px solid rgba(255,255,255,0.8)' }} />
+                <img src={member.photoDataUrl} alt={member.name} style={{ width:18,height:18,borderRadius:'50%',objectFit:'cover',border:'2px solid rgba(255,255,255,0.8)',flexShrink:0 }} />
               ) : (
-                <div style={{ width:20,height:20,borderRadius:'50%',background:barC,border:'2px solid rgba(255,255,255,0.8)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:'#fff' }}>
+                <div style={{ width:18,height:18,borderRadius:'50%',background:barC,border:'2px solid rgba(255,255,255,0.8)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,fontWeight:700,color:'#fff',flexShrink:0 }}>
                   {(member.avatar||'?')[0].toUpperCase()}
                 </div>
               )}
@@ -490,5 +583,147 @@ function TimeColumn({ events, members, onToggle, onEventClick, colIndex, compact
         )
       })}
     </div>
+  )
+}
+
+// ── Family Events Modal ────────────────────────────────────
+const EVENT_EMOJIS = ['📌','🎂','✈️','🏖️','🎉','🏥','🎓','⚽','🎼','🏆','🍕','🎁','🌟','🏠','🚗','❤️','🎪','🎯']
+const EVENT_COLORS = ['#F9D2D2','#D4F1EE','#E2D6F3','#C5E5F1','#D9EAD3','#FAE0C8','#FEF3C7','#E0E7FF']
+
+function FamilyEventsModal({
+  events, onAdd, onRemove, onClose
+}: {
+  events: FamilyEvent[]
+  onAdd: (ev: FamilyEvent) => void
+  onRemove: (id: string) => void
+  onClose: () => void
+}) {
+  const [title, setTitle]   = useState('')
+  const [emoji, setEmoji]   = useState('📌')
+  const [date, setDate]     = useState(new Date().toISOString().slice(0,10))
+  const [endDate, setEndDate] = useState('')
+  const [color, setColor]   = useState(EVENT_COLORS[0])
+
+  function handleAdd() {
+    if (!title.trim()) return
+    onAdd({ id:`fe-${Date.now()}`, title:title.trim(), emoji, date, endDate:endDate||undefined, color })
+    setTitle(''); setEmoji('📌'); setEndDate('')
+  }
+
+  return (
+    <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+      onClick={e => e.target===e.currentTarget && onClose()}
+      style={{ position:'fixed',inset:0,zIndex:50,background:'rgba(0,0,0,0.30)',backdropFilter:'blur(8px)',display:'flex',alignItems:'flex-end',justifyContent:'center' }}>
+      <motion.div
+        initial={{ y:60, opacity:0 }} animate={{ y:0, opacity:1 }} exit={{ y:60, opacity:0 }}
+        transition={{ type:'spring', stiffness:340, damping:30 }}
+        style={{ width:'100%',maxWidth:560,maxHeight:'88vh',background:'rgba(255,251,247,0.97)',backdropFilter:'blur(32px)',borderRadius:'28px 28px 0 0',display:'flex',flexDirection:'column',boxShadow:'0 -4px 48px rgba(0,0,0,0.12)',overflow:'hidden' }}>
+        {/* Header */}
+        <div style={{ padding:'16px 24px 12px',borderBottom:'1px solid rgba(0,0,0,0.07)',flexShrink:0 }}>
+          <div style={{ width:40,height:4,borderRadius:99,background:'rgba(0,0,0,0.12)',margin:'0 auto 14px' }} />
+          <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between' }}>
+            <div>
+              <h2 style={{ fontSize:20,fontWeight:900,fontFamily:'var(--font-heading)',color:'#2D3748' }}>
+                📌 Eventos Familiares
+              </h2>
+              <p style={{ fontSize:12,color:'#A0AEC0',marginTop:2 }}>
+                Aparecen en la franja del nombre de la familia
+              </p>
+            </div>
+            <button onClick={onClose}
+              style={{ width:34,height:34,borderRadius:10,border:'1px solid rgba(0,0,0,0.08)',background:'rgba(255,255,255,0.80)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
+              <X size={16} color="#718096" />
+            </button>
+          </div>
+        </div>
+
+        {/* Scroll area */}
+        <div style={{ flex:1,overflowY:'auto',padding:'16px 24px' }}>
+          {/* Add form */}
+          <div style={{ background:'rgba(255,255,255,0.85)',borderRadius:18,padding:'16px',marginBottom:20,border:'1px solid rgba(0,0,0,0.07)',boxShadow:'0 2px 8px rgba(0,0,0,0.05)' }}>
+            <p style={{ fontSize:12,fontWeight:700,color:'#718096',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:12 }}>
+              Agregar evento
+            </p>
+
+            {/* Emoji row */}
+            <div style={{ display:'flex',gap:6,flexWrap:'wrap',marginBottom:12 }}>
+              {EVENT_EMOJIS.map(e => (
+                <button key={e} onClick={() => setEmoji(e)}
+                  style={{ width:38,height:38,borderRadius:10,border:`2px solid ${emoji===e?'#E07B8A':'rgba(0,0,0,0.08)'}`,background:emoji===e?'rgba(224,123,138,0.10)':'rgba(255,255,255,0.90)',fontSize:20,cursor:'pointer' }}>
+                  {e}
+                </button>
+              ))}
+            </div>
+
+            {/* Title */}
+            <input value={title} onChange={e=>setTitle(e.target.value)}
+              onKeyDown={e=>e.key==='Enter'&&handleAdd()}
+              placeholder="Nombre del evento (ej: Vacaciones en Miami)"
+              style={{ width:'100%',padding:'11px 14px',borderRadius:12,border:'1.5px solid rgba(0,0,0,0.08)',fontSize:14,fontWeight:600,fontFamily:'var(--font-body)',color:'#2D3748',outline:'none',background:'rgba(255,255,255,0.90)',marginBottom:10 }}
+              autoFocus />
+
+            {/* Dates */}
+            <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12 }}>
+              <div>
+                <label style={{ fontSize:11,fontWeight:700,color:'#A0AEC0',textTransform:'uppercase',letterSpacing:'0.06em',display:'block',marginBottom:6 }}>Fecha inicio</label>
+                <input type="date" value={date} onChange={e=>setDate(e.target.value)}
+                  style={{ width:'100%',padding:'10px 12px',borderRadius:10,border:'1.5px solid rgba(0,0,0,0.08)',fontSize:13,fontFamily:'var(--font-body)',background:'rgba(255,255,255,0.90)',outline:'none',color:'#2D3748',fontWeight:600 }} />
+              </div>
+              <div>
+                <label style={{ fontSize:11,fontWeight:700,color:'#A0AEC0',textTransform:'uppercase',letterSpacing:'0.06em',display:'block',marginBottom:6 }}>Fecha fin (opcional)</label>
+                <input type="date" value={endDate} onChange={e=>setEndDate(e.target.value)}
+                  style={{ width:'100%',padding:'10px 12px',borderRadius:10,border:'1.5px solid rgba(0,0,0,0.08)',fontSize:13,fontFamily:'var(--font-body)',background:'rgba(255,255,255,0.90)',outline:'none',color:'#2D3748',fontWeight:600 }} />
+              </div>
+            </div>
+
+            {/* Color */}
+            <div style={{ display:'flex',gap:8,marginBottom:14,flexWrap:'wrap' }}>
+              {EVENT_COLORS.map(c => (
+                <button key={c} onClick={() => setColor(c)}
+                  style={{ width:28,height:28,borderRadius:'50%',background:c,border:`3px solid ${color===c?'#2D3748':'transparent'}`,cursor:'pointer',boxShadow:color===c?`0 0 0 2px rgba(255,255,255,0.9)`:undefined }} />
+              ))}
+            </div>
+
+            <motion.button whileTap={{scale:0.97}} onClick={handleAdd} disabled={!title.trim()}
+              style={{ width:'100%',padding:'12px',borderRadius:14,border:'none',background:title.trim()?'linear-gradient(135deg,#E07B8A,#D45C6B)':'rgba(0,0,0,0.08)',color:title.trim()?'#fff':'#A0AEC0',fontSize:14,fontWeight:800,fontFamily:'var(--font-heading)',cursor:title.trim()?'pointer':'default',display:'flex',alignItems:'center',justifyContent:'center',gap:8,boxShadow:title.trim()?'0 4px 14px rgba(224,123,138,0.35)':'none' }}>
+              <Plus size={16} strokeWidth={2.5} /> Agregar evento
+            </motion.button>
+          </div>
+
+          {/* Existing events */}
+          {events.length > 0 && (
+            <div>
+              <p style={{ fontSize:12,fontWeight:700,color:'#718096',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:10 }}>
+                Eventos guardados ({events.length})
+              </p>
+              {[...events].sort((a,b)=>a.date.localeCompare(b.date)).map(ev => (
+                <div key={ev.id}
+                  style={{ display:'flex',alignItems:'center',gap:12,padding:'12px 14px',borderRadius:14,background:ev.color||'rgba(255,255,255,0.85)',border:'1px solid rgba(255,255,255,0.70)',marginBottom:8,boxShadow:'0 1px 4px rgba(0,0,0,0.06)' }}>
+                  <span style={{ fontSize:22 }}>{ev.emoji}</span>
+                  <div style={{ flex:1,minWidth:0 }}>
+                    <p style={{ fontSize:14,fontWeight:800,color:'#2D3748',fontFamily:'var(--font-heading)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' }}>{ev.title}</p>
+                    <p style={{ fontSize:11,color:'#718096',marginTop:2 }}>
+                      {ev.date}{ev.endDate ? ` → ${ev.endDate}` : ''}
+                    </p>
+                  </div>
+                  <button onClick={() => onRemove(ev.id)}
+                    style={{ width:30,height:30,borderRadius:8,border:'none',background:'rgba(255,59,48,0.10)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',color:'#FF3B30',flexShrink:0 }}>
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {events.length === 0 && (
+            <div style={{ textAlign:'center',paddingTop:24,color:'#A0AEC0' }}>
+              <div style={{ fontSize:40,marginBottom:8 }}>📌</div>
+              <p style={{ fontWeight:700,fontSize:14,color:'#718096' }}>Sin eventos todavía</p>
+              <p style={{ fontSize:12,marginTop:4 }}>Agrega cumpleaños, vacaciones, eventos importantes…</p>
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
   )
 }
