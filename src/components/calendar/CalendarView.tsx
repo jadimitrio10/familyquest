@@ -33,22 +33,38 @@ function saveCompletions(c: Record<string, boolean>) {
   try { localStorage.setItem(COMPLETIONS_KEY, JSON.stringify(c)) } catch {}
 }
 
-interface StoredTask { id:string; title:string; emoji:string; memberId:string; type:'fixed'|'once'; done:boolean; dueDate?:string }
+interface StoredTask {
+  id:string; title:string; emoji:string; memberId:string
+  type:'fixed'|'once'; done:boolean; dueDate?:string
+  startTime?:string; endTime?:string; allDay?:boolean
+}
 
 function loadTaskEvents(weekDates: string[]): CalendarEvent[] {
   try {
     const tasks: StoredTask[] = JSON.parse(localStorage.getItem(TASKS_KEY) ?? '[]')
     const completions = loadCompletions()
     const events: CalendarEvent[] = []
+
     for (const t of tasks) {
+      const isAllDay = t.allDay !== false ? !t.startTime : false
+      const makeEvent = (date: string, key: string): CalendarEvent => ({
+        id: `task:${key}`,
+        title: t.title, emoji: t.emoji,
+        memberId: t.memberId, date,
+        allDay: isAllDay,
+        startTime: t.startTime,
+        endTime: t.endTime,
+        completed: completions[key] ?? false,
+      })
+
       if (t.type === 'fixed') {
         for (const date of weekDates) {
           const key = `${t.id}:${date}`
-          events.push({ id:`task:${key}`, title:t.title, emoji:t.emoji, memberId:t.memberId, date, allDay:true, completed: completions[key] ?? false })
+          events.push(makeEvent(date, key))
         }
       } else if (t.type === 'once' && t.dueDate && weekDates.includes(t.dueDate)) {
         const key = `${t.id}:${t.dueDate}`
-        events.push({ id:`task:${key}`, title:t.title, emoji:t.emoji, memberId:t.memberId, date:t.dueDate, allDay:true, completed: completions[key] ?? t.done })
+        events.push({ ...makeEvent(t.dueDate, key), completed: completions[key] ?? t.done })
       }
     }
     return events

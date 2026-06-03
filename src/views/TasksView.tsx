@@ -14,6 +14,10 @@ export interface Task {
   done: boolean; type: 'fixed' | 'once'
   priority: 'high' | 'medium' | 'low'
   dueDate?: string; notes?: string
+  // Scheduling
+  startTime?: string   // '09:00'
+  endTime?: string     // '10:00'
+  allDay?: boolean     // true = no specific time
 }
 
 const STORAGE_KEY = 'fq_tasks_v2'
@@ -76,6 +80,9 @@ export function TasksView() {
     type: 'once' as 'fixed' | 'once',
     priority: 'medium' as 'high' | 'medium' | 'low',
     dueDate: '', notes: '',
+    hasTime: false,
+    startTime: '08:00',
+    endTime: '09:00',
   })
 
   useEffect(() => {
@@ -118,6 +125,10 @@ export function TasksView() {
       done: false, type: form.type, priority: form.priority,
       dueDate: form.dueDate || undefined,
       notes: form.notes || undefined,
+      // Time scheduling
+      allDay: !form.hasTime,
+      startTime: form.hasTime ? form.startTime : undefined,
+      endTime:   form.hasTime ? form.endTime   : undefined,
     }])
 
     // Queue: if more library items selected
@@ -137,7 +148,7 @@ export function TasksView() {
 
   function closeAll() {
     setFlow(null); setLibSelected(new Set()); setLibItem(null); setShowEmoji(false)
-    setForm({ title: '', emoji: '✅', type: 'once', priority: 'medium', dueDate: '', notes: '' })
+    setForm({ title: '', emoji: '✅', type: 'once', priority: 'medium', dueDate: '', notes: '', hasTime: false, startTime: '08:00', endTime: '09:00' })
   }
 
   // ── RENDER ──────────────────────────────────────────────
@@ -559,6 +570,77 @@ export function TasksView() {
               </>
             )}
 
+            {/* ── TIME PICKER ── */}
+            <FormLabel>Hora</FormLabel>
+            <div style={{ marginBottom: 14 }}>
+              {/* Toggle hasTime */}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 16px', borderRadius:12, background:'rgba(255,255,255,0.80)', border:'1.5px solid rgba(0,0,0,0.08)', marginBottom: form.hasTime ? 10 : 0, cursor:'pointer' }}
+                onClick={() => setForm(f => ({ ...f, hasTime: !f.hasTime }))}>
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  <span style={{ fontSize:18 }}>🕐</span>
+                  <div>
+                    <p style={{ fontSize:14, fontWeight:700, color:'var(--text-1)', fontFamily:'var(--font-body)' }}>
+                      {form.hasTime ? `${form.startTime} → ${form.endTime}` : 'Sin hora específica'}
+                    </p>
+                    <p style={{ fontSize:11, color:'var(--text-3)', marginTop:1 }}>
+                      {form.hasTime ? 'Aparece en el horario del calendario' : 'Toca para elegir una hora'}
+                    </p>
+                  </div>
+                </div>
+                {/* iOS toggle */}
+                <motion.div
+                  animate={{ backgroundColor: form.hasTime ? accent : '#E5E5EA' }}
+                  style={{ width:44, height:26, borderRadius:100, position:'relative', border:'none', flexShrink:0 }}
+                >
+                  <motion.div
+                    animate={{ x: form.hasTime ? 20 : 2 }}
+                    transition={{ type:'spring', stiffness:500, damping:30 }}
+                    style={{ position:'absolute', top:2, width:22, height:22, borderRadius:'50%', background:'#fff', boxShadow:'0 2px 6px rgba(0,0,0,0.22)' }}
+                  />
+                </motion.div>
+              </div>
+
+              {/* Time inputs — show when hasTime */}
+              <AnimatePresence>
+                {form.hasTime && (
+                  <motion.div initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }}
+                    style={{ overflow:'hidden' }}>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                      <div>
+                        <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.08em', display:'block', marginBottom:6 }}>
+                          🟢 Inicio
+                        </label>
+                        <input
+                          type="time"
+                          value={form.startTime}
+                          onChange={e => setForm(f => ({ ...f, startTime: e.target.value }))}
+                          style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${accent}40`, background:'rgba(255,255,255,0.90)', fontSize:16, fontWeight:700, color:'var(--text-1)', outline:'none', fontFamily:'var(--font-body)', cursor:'pointer' }}
+                          onFocus={e => e.currentTarget.style.borderColor = accent}
+                          onBlur={e => e.currentTarget.style.borderColor = `${accent}40`}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize:11, fontWeight:700, color:'var(--text-3)', textTransform:'uppercase', letterSpacing:'0.08em', display:'block', marginBottom:6 }}>
+                          🔴 Fin
+                        </label>
+                        <input
+                          type="time"
+                          value={form.endTime}
+                          onChange={e => setForm(f => ({ ...f, endTime: e.target.value }))}
+                          style={{ width:'100%', padding:'12px 14px', borderRadius:12, border:`1.5px solid ${accent}40`, background:'rgba(255,255,255,0.90)', fontSize:16, fontWeight:700, color:'var(--text-1)', outline:'none', fontFamily:'var(--font-body)', cursor:'pointer' }}
+                          onFocus={e => e.currentTarget.style.borderColor = accent}
+                          onBlur={e => e.currentTarget.style.borderColor = `${accent}40`}
+                        />
+                      </div>
+                    </div>
+                    <p style={{ fontSize:11, color:'var(--text-3)', marginTop:8, textAlign:'center' }}>
+                      El task aparecerá en el calendario a las {form.startTime} 📅
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             {/* Notes */}
             <FormLabel>Nota (opcional)</FormLabel>
             <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
@@ -801,7 +883,13 @@ function AppleTaskCard({ task, member, onToggle, onRemove, delay = 0, dimmed }: 
               <Repeat2 size={9} /> Diario
             </span>
           )}
-          {task.dueDate && (
+          {/* Show time if task has one */}
+          {task.startTime && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: acc, background: `${acc}15`, padding: '2px 8px', borderRadius: 99 }}>
+              🕐 {task.startTime}{task.endTime ? ` → ${task.endTime}` : ''}
+            </span>
+          )}
+          {!task.startTime && task.dueDate && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-3)' }}>
               <CalendarDays size={10} /> {task.dueDate}
             </span>
