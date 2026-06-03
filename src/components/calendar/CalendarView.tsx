@@ -10,15 +10,30 @@ import { EventDetailModal } from './EventDetailModal'
 import { useCalendarStore } from '@/hooks/useCalendarStore'
 import { type CalendarEvent, type CalendarMember } from '@/types/calendar.types'
 import type { Member } from '@/hooks/useMembersStore'
-import { addDays, format, startOfWeek } from 'date-fns'
+import { addDays, format } from 'date-fns'
 
-// Convert Member → CalendarMember (passes photos through)
-function toCalendarMembers(members: Member[]): (CalendarMember & { emoji: string; photoDataUrl?: string })[] {
+// ─────────────────────────────────────────────────────────
+// Get Monday of current week — manual, no date-fns dependency
+// JavaScript getDay(): 0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat
+function getMondayOfWeek(d: Date): Date {
+  const day = d.getDay()                    // 0=Sun…6=Sat
+  const diff = day === 0 ? -6 : 1 - day    // Mon=0, Tue=-1 … Sun=-6
+  const monday = new Date(d)
+  monday.setDate(d.getDate() + diff)
+  monday.setHours(0, 0, 0, 0)
+  return monday
+}
+
+// ─────────────────────────────────────────────────────────
+// Convert Member → CalendarMember (with photos)
+type RichMember = CalendarMember & { emoji: string; photoDataUrl?: string }
+
+function toRichMembers(members: Member[]): RichMember[] {
   return members.map(m => ({
     id: m.id,
     name: m.name,
     avatar: m.emoji,
-    avatarUrl: m.photoDataUrl,   // ← photo for display
+    avatarUrl: m.photoDataUrl,
     emoji: m.emoji,
     photoDataUrl: m.photoDataUrl,
     bgColor: m.bgColor,
@@ -28,48 +43,46 @@ function toCalendarMembers(members: Member[]): (CalendarMember & { emoji: string
   }))
 }
 
-// Convert a Task (from TasksView) to a CalendarEvent
-function taskToEvent(task: {
+// ─────────────────────────────────────────────────────────
+// Load tasks and convert to CalendarEvents for given dates
+const TASKS_KEY = 'fq_tasks_v2'
+
+interface StoredTask {
   id: string; title: string; emoji: string; memberId: string
-  type: 'fixed' | 'once'; done: boolean
-  dueDate?: string; startTime?: string
-}, dateStr: string): CalendarEvent {
-  return {
-    id: `task-${task.id}-${dateStr}`,
-    title: task.title,
-    emoji: task.emoji,
-    memberId: task.memberId,
-    date: dateStr,
-    startTime: (task as any).startTime,
-    allDay: !(task as any).startTime,
-    completed: task.done,
-    recurrence: task.type === 'fixed' ? 'daily' : undefined,
-  }
+  type: 'fixed' | 'once'; done: boolean; dueDate?: string
 }
 
-// Load tasks from localStorage and convert to calendar events for the given week
-const TASKS_KEY = 'fq_tasks_v2'
-function getTaskEvents(weekDates: string[]): CalendarEvent[] {
+function loadTaskEvents(weekDates: string[]): CalendarEvent[] {
   try {
     const raw = localStorage.getItem(TASKS_KEY)
     if (!raw) return []
-    const tasks: Array<{
-      id: string; title: string; emoji: string; memberId: string
-      type: 'fixed' | 'once'; done: boolean; dueDate?: string
-    }> = JSON.parse(raw)
-
+    const tasks: StoredTask[] = JSON.parse(raw)
     const events: CalendarEvent[] = []
-    for (const task of tasks) {
-      if (task.type === 'fixed') {
-        // Fixed tasks appear on every day of the week
+
+    for (const t of tasks) {
+      if (t.type === 'fixed') {
+        // Fixed = show every day of this week
         for (const date of weekDates) {
-          events.push(taskToEvent(task, date))
+          events.push({
+            id: `task:${t.id}:${date}`,
+            title: t.title,
+            emoji: t.emoji,
+            memberId: t.memberId,
+            date,
+            allDay: true,
+            completed: t.done,
+          })
         }
-      } else if (task.type === 'once' && task.dueDate) {
-        // One-time tasks appear on their due date if it falls in this week
-        if (weekDates.includes(task.dueDate)) {
-          events.push(taskToEvent(task, task.dueDate))
-        }
+      } else if (t.type === 'once' && t.dueDate && weekDates.includes(t.dueDate)) {
+        events.push({
+          id: `task:${t.id}:${t.dueDate}`,
+          title: t.title,
+          emoji: t.emoji,
+          memberId: t.memberId,
+          date: t.dueDate,
+          allDay: true,
+          completed: t.done,
+        })
       }
     }
     return events
@@ -78,85 +91,75 @@ function getTaskEvents(weekDates: string[]): CalendarEvent[] {
   }
 }
 
-// Get the Monday of the current week (week starts Monday)
-function getThisMonday(): Date {
-  return startOfWeek(new Date(), { weekStartsOn: 1 }) // 1 = Monday
-}
-
-// Build 7 consecutive days starting from a Monday
+// ─────────────────────────────────────────────────────────
+// Day labels Mon→Sun
 const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+const todayStr = () => format(new Date(), 'yyyy-MM-dd')
 
+// ─────────────────────────────────────────────────────────
 export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
   const [activeMember, setActiveMember] = useState<string | null>(null)
-  const [showAdd, setShowAdd] = useState(false)
+  const [showAdd, setShowAdd]           = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
-  const [weekOffset, setWeekOffset] = useState(0)
-  const [tick, setTick] = useState(0)
+  const [weekOffset, setWeekOffset]     = useState(0)
+  const [refreshTick, setRefreshTick]   = useState(0)
 
-  // Re-render when tasks change (listen to storage events)
+  // Poll task changes every 2s
   useEffect(() => {
-    const handler = () => setTick(t => t + 1)
-    window.addEventListener('storage', handler)
-    // Also poll every 2s for same-tab changes
-    const interval = setInterval(() => setTick(t => t + 1), 2000)
-    return () => { window.removeEventListener('storage', handler); clearInterval(interval) }
+    const id = setInterval(() => setRefreshTick(n => n + 1), 2000)
+    window.addEventListener('storage', () => setRefreshTick(n => n + 1))
+    return () => clearInterval(id)
   }, [])
 
   const { events: calEvents, toggleEvent, addEvent, deleteEvent, updateEvent } = useCalendarStore()
 
-  const MEMBERS = useMemo(
-    () => rawMembers ? toCalendarMembers(rawMembers) : [],
+  const MEMBERS: RichMember[] = useMemo(
+    () => rawMembers ? toRichMembers(rawMembers) : [],
     [rawMembers]
   )
 
-  // Week calculation — always starts on Monday
-  const thisMonday = getThisMonday()
-  const weekStart = addDays(thisMonday, weekOffset * 7)
+  // ── WEEK DATES — always Mon→Sun ──
+  const baseMonday = getMondayOfWeek(new Date())            // Monday of THIS week
+  const weekStart  = addDays(baseMonday, weekOffset * 7)   // shift by offset
 
   const weekDays = DAY_LABELS.map((label, i) => {
-    const date = addDays(weekStart, i)
-    return {
-      date: format(date, 'yyyy-MM-dd'),
-      num: date.getDate(),
-      label,
-      isToday: format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd'),
-    }
+    const d    = addDays(weekStart, i)
+    const date = format(d, 'yyyy-MM-dd')
+    return { date, num: d.getDate(), label, isToday: date === todayStr() }
   })
 
   const row1 = weekDays.slice(0, 4)   // Lun–Jue
-  const row2 = weekDays.slice(4, 7)   // Vie–Dom + Next Week
+  const row2 = weekDays.slice(4, 7)   // Vie–Dom  (4th col = Next Week)
 
-  // Merge calendar events + task events
-  const weekDates = weekDays.map(d => d.date)
+  const weekDates    = weekDays.map(d => d.date)
+  const weekDatesKey = weekDates.join(',')
+
+  // ── TASK EVENTS (derived from Tasks view storage) ──
   const taskEvents = useMemo(
-    () => getTaskEvents(weekDates),
+    () => loadTaskEvents(weekDates),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [weekDates.join(','), tick]
+    [weekDatesKey, refreshTick]
   )
 
-  // All events: calendar events + task-derived events (dedup by id)
-  const allEventIds = new Set(calEvents.map(e => e.id))
-  const mergedEvents = [
-    ...calEvents,
-    ...taskEvents.filter(te => !allEventIds.has(te.id)),
-  ]
+  // ── MERGE calendar events + task events (no duplicates) ──
+  const calIds     = new Set(calEvents.map(e => e.id))
+  const allEvents  = [...calEvents, ...taskEvents.filter(t => !calIds.has(t.id))]
 
-  const eventsForDay = (date: string) => mergedEvents.filter(e => e.date === date)
-  const toggleMember = (id: string) => setActiveMember(prev => prev === id ? null : id)
+  const eventsForDay   = (date: string) => allEvents.filter(e => e.date === date)
+  const toggleMember   = (id: string)   => setActiveMember(p => p === id ? null : id)
 
-  function handleToggleEvent(id: string) {
-    // If it's a task event, update the task in localStorage
-    if (id.startsWith('task-')) {
-      const parts = id.split('-')
-      const taskId = parts.slice(1, -1).join('-')
+  // Toggle a task event → update fq_tasks_v2 directly
+  function handleToggle(id: string) {
+    if (id.startsWith('task:')) {
+      const taskId = id.split(':')[1]
       try {
         const raw = localStorage.getItem(TASKS_KEY)
-        if (raw) {
-          const tasks = JSON.parse(raw)
-          const updated = tasks.map((t: any) => t.id === taskId ? { ...t, done: !t.done } : t)
-          localStorage.setItem(TASKS_KEY, JSON.stringify(updated))
-          setTick(t => t + 1)
-        }
+        if (!raw) return
+        const tasks: StoredTask[] = JSON.parse(raw)
+        localStorage.setItem(TASKS_KEY, JSON.stringify(
+          tasks.map(t => t.id === taskId ? { ...t, done: !t.done } : t)
+        ))
+        setRefreshTick(n => n + 1)
       } catch {}
     } else {
       toggleEvent(id)
@@ -167,6 +170,7 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden" style={{ background: 'var(--bg)' }}>
+
       <CalendarTopBar
         weekStart={weekStart}
         weekEnd={addDays(weekStart, 6)}
@@ -175,25 +179,25 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
         onNext={() => setWeekOffset(o => o + 1)}
       />
 
-      {/* Member chips */}
+      {/* Member chips — show photos */}
       <div style={{ display: 'flex', gap: 10, padding: '0 16px 12px', flexShrink: 0, flexWrap: 'wrap' }}>
         {MEMBERS.length === 0 && (
           <p style={{ fontSize: 13, color: 'var(--text-3)', fontFamily: 'var(--font-body)', padding: '8px 0' }}>
-            👋 Ve a Ajustes para agregar miembros, luego usa "+ Add Event"
+            👋 Ve a Ajustes para agregar miembros
           </p>
         )}
-        {MEMBERS.map(member => !member?.bgColor ? null : (
+        {MEMBERS.map(m => (
           <MemberChip
-            key={member.id}
-            member={member}
-            events={mergedEvents.filter(e => e.memberId === member.id)}
-            isActive={activeMember === null || activeMember === member.id}
-            onClick={() => toggleMember(member.id)}
+            key={m.id}
+            member={m}
+            events={allEvents.filter(e => e.memberId === m.id)}
+            isActive={activeMember === null || activeMember === m.id}
+            onClick={() => toggleMember(m.id)}
           />
         ))}
       </div>
 
-      {/* Calendar 4×2 grid */}
+      {/* Grid 4×2 : Lun–Jue / Vie–Dom + Next Week */}
       <AnimatePresence mode="wait">
         <motion.div
           key={weekOffset}
@@ -214,6 +218,7 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
             overflow: 'hidden',
           }}
         >
+          {/* Row 1: Lun Mar Mié Jue */}
           {row1.map((day, idx) => (
             <DayColumn
               key={day.date}
@@ -223,11 +228,13 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
               events={eventsForDay(day.date)}
               members={MEMBERS as unknown as CalendarMember[]}
               activeMemberId={activeMember}
-              onToggle={handleToggleEvent}
+              onToggle={handleToggle}
               onEventClick={setSelectedEvent}
               colIndex={idx}
             />
           ))}
+
+          {/* Row 2: Vie Sáb Dom + Next Week */}
           {row2.map((day, idx) => (
             <DayColumn
               key={day.date}
@@ -237,11 +244,13 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
               events={eventsForDay(day.date)}
               members={MEMBERS as unknown as CalendarMember[]}
               activeMemberId={activeMember}
-              onToggle={handleToggleEvent}
+              onToggle={handleToggle}
               onEventClick={setSelectedEvent}
               colIndex={idx + 4}
             />
           ))}
+
+          {/* Next Week column */}
           <div style={{ borderLeft: '1px solid var(--border)', borderTop: '1px solid var(--border)' }}>
             <NextWeekColumn dateRange={nextLabel} onGoNext={() => setWeekOffset(o => o + 1)} />
           </div>
@@ -256,9 +265,9 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
         style={{
           position: 'fixed', bottom: 24, right: 24,
           width: 52, height: 52, borderRadius: '50%',
-          background: 'linear-gradient(135deg,var(--blue),#818CF8)',
+          background: 'linear-gradient(135deg, #007AFF, #5856D6)',
           color: '#fff', border: 'none', cursor: 'pointer',
-          boxShadow: '0 4px 20px rgba(79,70,229,0.45)',
+          boxShadow: '0 4px 20px rgba(0,122,255,0.45)',
           zIndex: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
@@ -271,7 +280,7 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
         onClose={() => setSelectedEvent(null)}
         onDelete={(id) => { deleteEvent(id); setSelectedEvent(null) }}
         onUpdate={updateEvent}
-        onToggle={handleToggleEvent}
+        onToggle={handleToggle}
       />
     </div>
   )
