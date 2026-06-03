@@ -69,6 +69,60 @@
   --ease:   cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ══════════════════════════════════════════════════════════
+   DARK MODE — applied via data-theme="dark" on <html>
+══════════════════════════════════════════════════════════ */
+[data-theme="dark"] {
+  --bg:           #000000;
+  --bg-warm:      #1C1C1E;
+  --surface:      #1C1C1E;
+  --surface-warm: rgba(44,44,46,0.95);
+  --border:       rgba(255,255,255,0.10);
+  --border-soft:  rgba(255,255,255,0.08);
+  --text-1:       #FFFFFF;
+  --text-2:       rgba(235,235,245,0.80);
+  --text-3:       rgba(235,235,245,0.60);
+  --text-4:       rgba(235,235,245,0.38);
+  /* Keep pastels slightly muted for dark */
+  --mint:         #1A3A38;
+  --mint-dark:    #1A4844;
+  --mint-text:    #5DE0D5;
+  --pink:         #3A1A1A;
+  --pink-dark:    #4A2020;
+  --pink-text:    #FF8A8A;
+  --lavender:     #2A1A3A;
+  --lav-dark:     #3A2050;
+  --lav-text:     #C084FC;
+  --sky:          #1A2A3A;
+  --sky-dark:     #1A3550;
+  --sky-text:     #60BDEC;
+  --sage:         #1A2A18;
+  --sage-dark:    #1E3820;
+  --sage-text:    #6EC46A;
+  --peach:        #3A2010;
+  --peach-text:   #FCA96A;
+  --coral:        #FF6B6B;
+  --coral-dark:   #FF4444;
+  --shadow-xs:    0 1px 3px rgba(0,0,0,0.30);
+  --shadow-sm:    0 2px 8px rgba(0,0,0,0.40), 0 0 0 1px rgba(255,255,255,0.06);
+  --shadow-md:    0 4px 16px rgba(0,0,0,0.50);
+  --shadow-lg:    0 8px 32px rgba(0,0,0,0.60);
+}
+
+/* Sidebar in dark mode */
+[data-theme="dark"] aside {
+  background: #1C1C1E !important;
+  border-color: rgba(255,255,255,0.08) !important;
+}
+
+/* White cards become dark surface in dark mode */
+[data-theme="dark"] [style*="background: #fff"],
+[data-theme="dark"] [style*="background:#fff"],
+[data-theme="dark"] [style*="background: white"] {
+  background: #2C2C2E !important;
+  color: #FFFFFF;
+}
+
 /* ── Reset ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

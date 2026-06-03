@@ -42,6 +42,30 @@ export default function App() {
   const { t }                    = useT()
   const { syncTick, isConnected: cloudOk } = useLiveSync()
 
+  // ── Apply theme (dark/light/system) to <html> ──────────────────────────
+  useEffect(() => {
+    const theme = settings.theme || 'light'
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+    const isDark = theme === 'dark' || (theme === 'system' && prefersDark)
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light')
+  }, [settings.theme])
+
+  // ── Apply accent color as CSS variable ────────────────────────────────
+  useEffect(() => {
+    const color = (settings as any).accentColor || '#E07B8A'
+    document.documentElement.style.setProperty('--accent', color)
+    // Derive a soft bg from accent
+    document.documentElement.style.setProperty('--accent-bg', color + '20')
+  }, [(settings as any).accentColor])
+
+  // ── Apply font size as CSS variable ───────────────────────────────────
+  useEffect(() => {
+    const map: Record<string, string> = { small:'13px', normal:'15px', large:'17px', xlarge:'19px' }
+    const size = map[(settings as any).fontSize || 'normal'] ?? '15px'
+    document.documentElement.style.setProperty('--font-size-base', size)
+    document.documentElement.style.fontSize = size
+  }, [(settings as any).fontSize])
+
   // syncTick increments when Supabase pushes a change from another device
   // → forces all stores to re-read localStorage on the next render
   const storeKey = connected ? syncTick : 0

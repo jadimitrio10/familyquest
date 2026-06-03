@@ -70,6 +70,20 @@ function SettingsRow({
   )
 }
 
+// ── PILL SELECTOR — module scope to avoid re-render on every keystroke ──
+function PillSelect({ options, value, onChange }: { options:{v:string;l:string}[]; value:string; onChange:(v:string)=>void }) {
+  return (
+    <div style={{ display:'flex', background:'rgba(0,0,0,0.06)', borderRadius:10, padding:3 }}>
+      {options.map(o => (
+        <button key={o.v} onClick={() => onChange(o.v)}
+          style={{ padding:'6px 14px', borderRadius:8, border:'none', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)', background:value===o.v?'#fff':'transparent', color:value===o.v?'#1C1C1E':'#8E8E93', boxShadow:value===o.v?'0 1px 4px rgba(0,0,0,0.12)':'none', transition:'all 0.15s' }}>
+          {o.l}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 const COLOR_OPTIONS = [
   { bg:'#FFE4E6',text:'#9F1239',bar:'#FB7185' },
   { bg:'#E0F2FE',text:'#075985',bar:'#38BDF8' },
@@ -109,17 +123,16 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
   const { t } = useT()
   const SECTIONS = SECTION_META.map(s => ({ ...s, label: t(s.labelKey) }))
 
-  // Profile form — local state
+  // Profile form — local state, initialised from settings
   const [profileName, setProfileName] = useState(settings.familyName || '')
-  const [profilePhone, setProfilePhone] = useState('')
-
-  // Family member editing
+  const [profilePhone, setProfilePhone] = useState((settings as any).phone || '')
 
   // Cloud sync state (minimal — just open/close the modal)
   const [showCloudModal, setShowCloudModal] = useState(false)
   const cloudConnected = !!localStorage.getItem(FAMILY_ID_KEY)
   const cloudCode      = localStorage.getItem(FAMILY_CODE_KEY) || ''
 
+  // Family member editing
   const [editingId, setEditingId]         = useState<string|null>(null)
   const [editName, setEditName]           = useState('')
   const [showAddMember, setShowAddMember] = useState(false)
@@ -128,17 +141,12 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
   const [copied, setCopied]               = useState(false)
   const fileRefs = useRef<Record<string, HTMLInputElement>>({})
 
-  // Notifications
+  // Notifications — read from settings (persisted)
   const [notifMaster, setNotifMaster] = useState(settings.notifications)
-  const [notifTypes, setNotifTypes]   = useState({ taskReminder:true, taskDone:true, newEvent:true, achievement:true, reward:true })
-  const [silentHours, setSilentHours] = useState(false)
-  const [silentFrom, setSilentFrom]   = useState('22:00')
-  const [silentTo, setSilentTo]       = useState('07:00')
 
   // Security
   const [pwForm, setPwForm]     = useState({ current:'', next:'', confirm:'' })
   const [showPw, setShowPw]     = useState(false)
-  const [twoFA, setTwoFA]       = useState(false)
   const [deleteWord, setDeleteWord] = useState('')
 
   const saved = useCallback(() => {
@@ -169,17 +177,7 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
     toast.success('Código copiado 📋', { duration:1500 })
   }
 
-  // ── PILL SELECTOR ──
-  const PillSelect = ({ options, value, onChange }: { options:{v:string;l:string}[]; value:string; onChange:(v:string)=>void }) => (
-    <div style={{ display:'flex', background:'rgba(0,0,0,0.06)', borderRadius:10, padding:3 }}>
-      {options.map(o => (
-        <button key={o.v} onClick={() => onChange(o.v)}
-          style={{ padding:'6px 14px', borderRadius:8, border:'none', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)', background:value===o.v?'#fff':'transparent', color:value===o.v?'#1C1C1E':'#8E8E93', boxShadow:value===o.v?'0 1px 4px rgba(0,0,0,0.12)':'none', transition:'all 0.15s' }}>
-          {o.l}
-        </button>
-      ))}
-    </div>
-  )
+  // PillSelect moved to module scope — see below
 
   // ── SECTION CONTENT ──────────────────────────────────────────────────────
   const renderSection = () => {
@@ -214,7 +212,7 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
           </SettingsRow>
           <SettingsRow icon={<span style={{ fontSize:14 }}>📱</span>} iconBg="#34C759" label="Teléfono" last>
             <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)}
-              onBlur={saved}
+              onBlur={() => { onUpdate({ phone: profilePhone } as any); saved() }}
               placeholder="+1 (305) 000-0000"
               style={{ border:'none', outline:'none', fontSize:14, color:'#8E8E93', textAlign:'right', background:'transparent', fontFamily:'var(--font-body)', width:160 }} />
           </SettingsRow>
@@ -241,7 +239,7 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
           </SettingsRow>
         </SettingsGroup>
 
-        <motion.button whileTap={{ scale:0.97 }} onClick={() => { onUpdate({ familyName: profileName }); saved() }}
+        <motion.button whileTap={{ scale:0.97 }} onClick={() => { onUpdate({ familyName: profileName, phone: profilePhone } as any); saved() }}
           style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#007AFF,#0063CC)', color:'#fff', fontSize:15, fontWeight:700, fontFamily:'var(--font-heading)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'0 4px 14px rgba(0,122,255,0.30)' }}>
           <Save size={16} /> Guardar perfil
         </motion.button>
@@ -489,31 +487,39 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
         </SettingsGroup>
 
         <SettingsGroup label="Por tipo">
-          {[
-            { k:'taskReminder', l:'Recordatorio de task',   s:'Antes de que venza',          bg:'#FF9500' },
-            { k:'taskDone',     l:'Task completado',        s:'Cuando un hijo termina',       bg:'#34C759' },
-            { k:'newEvent',     l:'Nuevo evento',           s:'Eventos en el calendario',     bg:'#007AFF' },
-            { k:'achievement',  l:'Logro desbloqueado',     s:'¡Felicidades!',                bg:'#FFCC00' },
-            { k:'reward',       l:'Premio reclamado',       s:'Solicitudes de recompensa',    bg:'#AF52DE' },
-          ].map((item, i, arr) => (
+          {([
+            { k:'notifTaskReminder' as const, l:'Recordatorio de task',   s:'Antes de que venza',       bg:'#FF9500' },
+            { k:'notifTaskDone'     as const, l:'Task completado',        s:'Cuando un hijo termina',   bg:'#34C759' },
+            { k:'notifNewEvent'     as const, l:'Nuevo evento',           s:'Eventos en el calendario', bg:'#007AFF' },
+            { k:'notifAchievement'  as const, l:'Logro desbloqueado',     s:'¡Felicidades!',            bg:'#FFCC00' },
+            { k:'notifReward'       as const, l:'Premio reclamado',       s:'Solicitudes de recompensa',bg:'#AF52DE' },
+          ] as const).map((item, i, arr) => (
             <SettingsRow key={item.k} icon={<Bell size={14} color="#fff" />} iconBg={item.bg}
               label={item.l} sub={item.s} last={i===arr.length-1}>
-              <Toggle size="sm" value={(notifTypes as any)[item.k]} disabled={!notifMaster}
-                onChange={v => setNotifTypes(t=>({...t,[item.k]:v}))} />
+              <Toggle size="sm"
+                value={(settings as any)[item.k] !== false}
+                disabled={!notifMaster}
+                onChange={v => savePref(item.k as any, v as any)} />
             </SettingsRow>
           ))}
         </SettingsGroup>
 
         <SettingsGroup label="Horas de silencio">
           <SettingsRow icon={<span style={{ fontSize:14 }}>🌙</span>} iconBg="#636366" label="Silenciar notificaciones">
-            <Toggle value={silentHours} onChange={v => { setSilentHours(v); saved() }} />
+            <Toggle value={(settings as any).silentHours || false}
+              onChange={v => savePref('silentHours' as any, v as any)} />
           </SettingsRow>
-          {silentHours && (
+          {(settings as any).silentHours && (
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, padding:'0 16px 14px' }}>
-              {[{l:'Desde',v:silentFrom,s:setSilentFrom},{l:'Hasta',v:silentTo,s:setSilentTo}].map(f=>(
-                <div key={f.l}>
+              {([
+                { l:'Desde', k:'silentFrom' as const, def:'22:00' },
+                { l:'Hasta', k:'silentTo'   as const, def:'07:00' },
+              ] as const).map(f=>(
+                <div key={f.k}>
                   <p style={{ fontSize:11,fontWeight:600,color:'#8E8E93',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.05em' }}>{f.l}</p>
-                  <input type="time" value={f.v} onChange={e=>{f.s(e.target.value);saved()}}
+                  <input type="time"
+                    value={(settings as any)[f.k] || f.def}
+                    onChange={e => savePref(f.k as any, e.target.value as any)}
                     style={{ width:'100%',padding:'10px 12px',borderRadius:10,border:'1px solid rgba(0,0,0,0.10)',fontSize:14,fontFamily:'var(--font-body)',outline:'none',color:'#1C1C1E',background:'rgba(255,255,255,0.90)' }} />
                 </div>
               ))}
@@ -529,10 +535,12 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
         <SectionTitle>Gamificación</SectionTitle>
         <SettingsGroup>
           <SettingsRow icon={<span style={{ fontSize:14 }}>⭐</span>} iconBg="#FFCC00" label="Sistema de puntos" sub="Los hijos ganan puntos al completar tasks">
-            <Toggle value={true} onChange={() => toast('Próximamente')} />
+            <Toggle value={(settings as any).pointsEnabled !== false}
+              onChange={v => savePref('pointsEnabled' as any, v as any)} />
           </SettingsRow>
           <SettingsRow icon={<span style={{ fontSize:14 }}>🔥</span>} iconBg="#FF9500" label="Rachas" sub="Días consecutivos completando tasks" last>
-            <Toggle value={true} onChange={() => toast('Próximamente')} />
+            <Toggle value={(settings as any).streaksEnabled !== false}
+              onChange={v => savePref('streaksEnabled' as any, v as any)} />
           </SettingsRow>
         </SettingsGroup>
 
@@ -615,12 +623,20 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
 
         <SettingsGroup label="Seguridad adicional">
           <SettingsRow icon={<span style={{ fontSize:14 }}>🔐</span>} iconBg="#FF3B30" label="Autenticación 2 factores" sub="Más seguridad con autenticador" last>
-            <Toggle value={twoFA} onChange={v=>{setTwoFA(v);saved()}} />
+            <Toggle value={(settings as any).twoFAEnabled || false}
+              onChange={v => savePref('twoFAEnabled' as any, v as any)} />
           </SettingsRow>
         </SettingsGroup>
 
         <SettingsGroup label="Datos">
-          <SettingsRow icon={<Download size={15} color="#fff" />} iconBg="#007AFF" label="Descargar mis datos" showArrow onClick={()=>{const d=JSON.stringify({});const b=new Blob([d],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='familyquest-backup.json';a.click();toast.success('Descargando...')}} />
+          <SettingsRow icon={<Download size={15} color="#fff" />} iconBg="#007AFF" label="Descargar mis datos" showArrow onClick={()=>{
+            const keys = ['fq_settings','fq_members_v2','fq_tasks_v2','fq_task_completions','fq_events_v3','fq_family_events_v1','fq_points_v1','fq_points_history_v1','fq_rewards_v1','fq_calendar_prefs_v1']
+            const backup: Record<string,unknown> = { exportedAt: new Date().toISOString() }
+            keys.forEach(k => { try { backup[k] = JSON.parse(localStorage.getItem(k)||'null') } catch { backup[k] = null } })
+            const b=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'})
+            const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`familyquest-backup-${new Date().toISOString().slice(0,10)}.json`;a.click()
+            toast.success('Backup descargado ✅')
+          }} />
           <SettingsRow icon={<LogOut size={15} color="#fff" />} iconBg="#FF3B30" label="Cerrar sesión en todos" showArrow last onClick={()=>toast.error('Todas las sesiones cerradas')} />
         </SettingsGroup>
 

@@ -23,6 +23,22 @@ export interface AppSettings {
   language: 'es' | 'en' | 'fr'
   fontSize: 'small' | 'normal' | 'large' | 'xlarge'
   accentColor: string
+  // Profile
+  phone: string
+  // Notifications per-type
+  notifTaskReminder: boolean
+  notifTaskDone: boolean
+  notifNewEvent: boolean
+  notifAchievement: boolean
+  notifReward: boolean
+  silentHours: boolean
+  silentFrom: string
+  silentTo: string
+  // Security
+  twoFAEnabled: boolean
+  // Gamification
+  pointsEnabled: boolean
+  streaksEnabled: boolean
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -41,4 +57,16 @@ export const DEFAULT_SETTINGS: AppSettings = {
   language: 'es',
   fontSize: 'normal',
   accentColor: '#007AFF',
+  phone: '',
+  notifTaskReminder: true,
+  notifTaskDone: true,
+  notifNewEvent: true,
+  notifAchievement: true,
+  notifReward: true,
+  silentHours: false,
+  silentFrom: '22:00',
+  silentTo: '07:00',
+  twoFAEnabled: false,
+  pointsEnabled: true,
+  streaksEnabled: true,
 }
