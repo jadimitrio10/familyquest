@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useWeather } from '@/hooks/useWeather'
 import { FamilySetup } from '@/components/shared/FamilySetup'
-import { useAutoSync } from '@/hooks/useAutoSync'
+import { useLiveSync } from '@/hooks/useLiveSync'
 import { FAMILY_ID_KEY } from '@/lib/sync'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Calendar, CheckSquare, Star, UtensilsCrossed, Image, Moon, Settings, CloudSun } from 'lucide-react'
@@ -39,8 +39,12 @@ export default function App() {
   const { prefs: calPrefs } = useCalendarPrefs()
   const weather = useWeather()
   const [clockTime, setClockTime] = useState('')
-  const { t } = useT()
-  // useAutoSync() — temporarily disabled to prevent render loop
+  const { t }                    = useT()
+  const { syncTick, isConnected: cloudOk } = useLiveSync()
+
+  // syncTick increments when Supabase pushes a change from another device
+  // → forces all stores to re-read localStorage on the next render
+  const storeKey = connected ? syncTick : 0
 
   const NAV = NAV_IDS.map(n => ({ ...n, label: t(`nav.${n.id}`) }))
 
@@ -200,9 +204,16 @@ export default function App() {
 
       {/* Main */}
       <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}>
+        {/* Cloud sync indicator */}
+        {connected && (
+          <div style={{ height:2, background:cloudOk?'transparent':'rgba(0,122,255,0.3)', transition:'background 1s', flexShrink:0 }}>
+            {!cloudOk && <div style={{ height:'100%', background:'linear-gradient(90deg,transparent,#007AFF,transparent)', animation:'shimmer-slide 1.5s linear infinite' }} />}
+          </div>
+        )}
+
         <AnimatePresence mode="wait">
           <motion.div
-            key={activeView}
+            key={`${activeView}-${storeKey}`}
             initial={{ opacity:0, x:8 }}
             animate={{ opacity:1, x:0 }}
             exit={{ opacity:0, x:-8 }}
