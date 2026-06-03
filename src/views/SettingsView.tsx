@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { useT } from '@/lib/i18n'
-import { createFamily, joinFamily, uploadLocalData, downloadFamilyData, FAMILY_ID_KEY, FAMILY_CODE_KEY } from '@/lib/sync'
+import { FAMILY_ID_KEY, FAMILY_CODE_KEY } from '@/lib/sync'
+import { CloudSyncModal } from '@/components/shared/CloudSyncModal'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   User, Users, Palette, Bell, Trophy, CalendarDays,
@@ -113,58 +114,11 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
   const [profilePhone, setProfilePhone] = useState('')
 
   // Family member editing
-  // Cloud sync state
-  const [cloudId]   = useState<string|null>(() => localStorage.getItem(FAMILY_ID_KEY))
-  const cloudCode   = localStorage.getItem(FAMILY_CODE_KEY) || ''
-  const [syncing, setSyncing]   = useState(false)
-  const [joinCode, setJoinCode] = useState('')
-  const [showJoin, setShowJoin] = useState(false)
 
-  const [cloudDone, setCloudDone] = useState(false)
-  const [joinDone, setJoinDone]   = useState(false)
-
-  async function handleCloudCreate() {
-    setSyncing(true)
-    try {
-      const result = await createFamily(settings.familyName || 'Mi Familia')
-      if (!result) { toast.error('No se pudo conectar. Verifica internet.'); return }
-      // Upload without photos first (photos can be large)
-      try { await uploadLocalData(result.id) } catch (e) { console.warn('upload partial:', e) }
-      setCloudDone(true)
-      toast.success(`✅ ¡Conectado! Tu código: ${result.code}`, { duration: 8000 })
-    } catch (e) {
-      console.error(e)
-      toast.error('Error al conectar')
-    } finally {
-      setSyncing(false)
-    }
-  }
-
-  async function handleCloudSync() {
-    if (!cloudId) return
-    setSyncing(true)
-    try {
-      await uploadLocalData(cloudId)
-      toast.success('Datos sincronizados ✅')
-    } catch { toast.error('Error al sincronizar') } finally { setSyncing(false) }
-  }
-
-  async function handleJoin() {
-    if (!joinCode.trim()) return
-    setSyncing(true)
-    try {
-      const result = await joinFamily(joinCode.trim())
-      if (!result) { toast.error('Código incorrecto'); setSyncing(false); return }
-      await downloadFamilyData(localStorage.getItem(FAMILY_ID_KEY)!)
-      setJoinDone(true)
-      toast.success(`✅ ¡Conectado a ${result.name}! Recarga la página para ver los datos.`, { duration: 6000 })
-    } catch (e) {
-      console.error(e)
-      toast.error('Error al unirse')
-    } finally {
-      setSyncing(false)
-    }
-  }
+  // Cloud sync state (minimal — just open/close the modal)
+  const [showCloudModal, setShowCloudModal] = useState(false)
+  const cloudConnected = !!localStorage.getItem(FAMILY_ID_KEY)
+  const cloudCode      = localStorage.getItem(FAMILY_CODE_KEY) || ''
 
   const [editingId, setEditingId]         = useState<string|null>(null)
   const [editName, setEditName]           = useState('')
@@ -299,103 +253,46 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
       <div>
         <SectionTitle>Familia</SectionTitle>
 
-        {/* ── CLOUD SYNC (most important section) ── */}
+        {/* ── CLOUD SYNC — simple button, opens isolated modal ── */}
         <SettingsGroup label="📱 Sincronizar en todos tus dispositivos">
-          {!cloudId ? (
-            /* Not connected yet */
-            <div style={{ padding: 20 }}>
-              <p style={{ fontSize:15, fontWeight:700, color:'#1C1C1E', marginBottom:8, fontFamily:'var(--font-heading)' }}>
-                🌐 Conectar con la nube
-              </p>
-              <p style={{ fontSize:13, color:'#8E8E93', marginBottom:16, lineHeight:1.5 }}>
-                Conecta tu app para que funcione en el iPad, teléfono y cualquier dispositivo con el mismo link.
-              </p>
-
-              {!showJoin ? (
-                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                  {cloudDone ? (
-                    <div style={{ padding:'16px', borderRadius:14, background:'rgba(52,199,89,0.10)', border:'1.5px solid rgba(52,199,89,0.30)', textAlign:'center' }}>
-                      <p style={{ fontSize:16, fontWeight:900, color:'#34C759', fontFamily:'var(--font-heading)', marginBottom:6 }}>✅ ¡Familia creada en la nube!</p>
-                      <p style={{ fontSize:13, color:'#3C3C43', marginBottom:12 }}>Tu código aparece abajo. Úsalo en el iPad.</p>
-                      <p style={{ fontSize:22, fontWeight:900, color:'#007AFF', fontFamily:'monospace', letterSpacing:'0.15em', background:'rgba(0,122,255,0.08)', padding:'10px', borderRadius:10 }}>
-                        {localStorage.getItem('fq_family_code') || '—'}
-                      </p>
-                    </div>
-                  ) : (
-                    <motion.button whileTap={{ scale:0.97 }} onClick={handleCloudCreate} disabled={syncing}
-                      style={{ padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#34C759,#28A745)', color:'#fff', fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'var(--font-heading)', boxShadow:'0 4px 16px rgba(52,199,89,0.40)', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-                      {syncing ? '⏳ Conectando...' : '🏠 Este es mi PC principal — Crear familia en la nube'}
-                    </motion.button>
-                  )}
-                  {!cloudDone && (
-                  <button onClick={() => setShowJoin(true)}
-                    style={{ padding:'12px', borderRadius:14, border:'1.5px solid rgba(0,0,0,0.10)', background:'rgba(255,255,255,0.90)', color:'#007AFF', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)' }}>
-                    📱 Estoy en el iPad — Unirme a la familia existente
-                  </button>
-                  )}
-                </div>
-              ) : (
-                <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                  <p style={{ fontSize:13, color:'#3C3C43', fontWeight:600 }}>
-                    Escribe el código de 8 letras que ves en el otro dispositivo (Settings → Familia)
-                  </p>
-                  <input value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())} maxLength={8}
-                    placeholder="XXXXXXXX" autoFocus
-                    style={{ padding:'14px', borderRadius:12, border:'1.5px solid rgba(0,0,0,0.10)', fontSize:24, fontFamily:'monospace', fontWeight:800, textAlign:'center', letterSpacing:'0.2em', color:'#007AFF', outline:'none' }} />
-                  {joinDone ? (
-                    <div style={{ padding:'16px', borderRadius:14, background:'rgba(0,122,255,0.08)', border:'1.5px solid rgba(0,122,255,0.25)', textAlign:'center' }}>
-                      <p style={{ fontSize:15, fontWeight:900, color:'#007AFF', fontFamily:'var(--font-heading)', marginBottom:6 }}>✅ ¡Datos descargados!</p>
-                      <p style={{ fontSize:13, color:'#3C3C43', marginBottom:12 }}>Toca el botón para ver tu familia en este dispositivo:</p>
-                      <button onClick={() => window.location.reload()}
-                        style={{ padding:'12px 24px', borderRadius:12, border:'none', background:'#007AFF', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', fontFamily:'var(--font-heading)' }}>
-                        🔄 Recargar la app
-                      </button>
-                    </div>
-                  ) : (
-                    <motion.button whileTap={{ scale:0.97 }} onClick={handleJoin} disabled={joinCode.length<6||syncing}
-                      style={{ padding:'13px', borderRadius:14, border:'none', background: joinCode.length>=6 ? 'linear-gradient(135deg,#007AFF,#0063CC)' : '#E5E5EA', color: joinCode.length>=6 ? '#fff' : '#C7C7CC', fontSize:15, fontWeight:800, cursor: joinCode.length>=6 ? 'pointer' : 'default', fontFamily:'var(--font-heading)' }}>
-                      {syncing ? '⏳ Sincronizando...' : '🔗 Conectar y descargar datos'}
-                    </motion.button>
-                  )}
-                  <button onClick={() => setShowJoin(false)} style={{ background:'none', border:'none', color:'#8E8E93', fontSize:13, cursor:'pointer' }}>← Volver</button>
-                </div>
-              )}
-            </div>
-          ) : (
-            /* Already connected */
-            <div style={{ padding:16 }}>
-              <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:14 }}>
-                <span style={{ fontSize:28 }}>☁️</span>
-                <div>
-                  <p style={{ fontSize:14, fontWeight:800, color:'#34C759', fontFamily:'var(--font-heading)' }}>✅ Conectado a la nube</p>
-                  <p style={{ fontSize:12, color:'#8E8E93' }}>Los datos se sincronizan automáticamente</p>
-                </div>
-              </div>
-              {/* Code to share with other devices */}
-              <div style={{ background:'rgba(0,0,0,0.04)', borderRadius:12, padding:'12px 16px', marginBottom:12 }}>
-                <p style={{ fontSize:11, fontWeight:700, color:'#8E8E93', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6 }}>
-                  Código para el iPad/otro dispositivo
-                </p>
+          <div style={{ padding: 16 }}>
+            {cloudConnected ? (
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
                 <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-                  <span style={{ fontSize:22, fontWeight:900, color:'#007AFF', fontFamily:'monospace', letterSpacing:'0.15em', flex:1 }}>
-                    {cloudCode || '–'}
-                  </span>
-                  <button onClick={() => { navigator.clipboard.writeText(cloudCode); toast.success('Código copiado!') }}
-                    style={{ padding:'8px 16px', borderRadius:10, border:'none', background:'rgba(0,122,255,0.12)', color:'#007AFF', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)' }}>
-                    Copiar
-                  </button>
+                  <span style={{ fontSize:24 }}>☁️</span>
+                  <div>
+                    <p style={{ fontSize:14, fontWeight:800, color:'#34C759', fontFamily:'var(--font-heading)' }}>✅ Conectado a la nube</p>
+                    <p style={{ fontSize:12, color:'#8E8E93', marginTop:2 }}>
+                      Código: <strong style={{ color:'#007AFF', fontFamily:'monospace', letterSpacing:'0.1em' }}>{cloudCode}</strong>
+                    </p>
+                  </div>
                 </div>
+                <button onClick={() => setShowCloudModal(true)}
+                  style={{ padding:'8px 16px', borderRadius:12, border:'none', background:'rgba(52,199,89,0.12)', color:'#34C759', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)', flexShrink:0 }}>
+                  Gestionar
+                </button>
               </div>
-              <p style={{ fontSize:12, color:'#8E8E93', marginBottom:12, lineHeight:1.5 }}>
-                👆 En el iPad: abre el link, ve a <strong>Settings → Familia</strong> y escribe este código
-              </p>
-              <motion.button whileTap={{ scale:0.96 }} onClick={handleCloudSync} disabled={syncing}
-                style={{ width:'100%', padding:'11px', borderRadius:12, border:'none', background:syncing?'#E5E5EA':'rgba(52,199,89,0.12)', color:syncing?'#C7C7CC':'#34C759', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)' }}>
-                {syncing ? '⏳ Sincronizando...' : '🔄 Sincronizar ahora'}
-              </motion.button>
-            </div>
-          )}
+            ) : (
+              <div>
+                <p style={{ fontSize:14, color:'#3C3C43', marginBottom:14, lineHeight:1.5 }}>
+                  Conecta para que el <strong>iPad</strong>, teléfono y PC compartan los mismos datos.
+                </p>
+                <motion.button whileTap={{ scale:0.97 }} onClick={() => setShowCloudModal(true)}
+                  style={{ width:'100%', padding:'15px', borderRadius:16, border:'none', background:'linear-gradient(135deg,#34C759,#28A745)', color:'#fff', fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'var(--font-heading)', boxShadow:'0 4px 16px rgba(52,199,89,0.35)', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                  ☁️ Conectar mis dispositivos
+                </motion.button>
+              </div>
+            )}
+          </div>
         </SettingsGroup>
+
+        {/* Cloud sync modal — completely isolated */}
+        {showCloudModal && (
+          <CloudSyncModal
+            familyName={settings.familyName}
+            onClose={() => setShowCloudModal(false)}
+          />
+        )}
 
         {/* Invite code */}
         <SettingsGroup label="Código de invitación">
