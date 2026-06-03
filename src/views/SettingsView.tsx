@@ -1,21 +1,54 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Trash2, Edit2, Check, X, Camera, Upload, Bell, Globe, Clock, Thermometer, Users, Palette, Shield, Save } from 'lucide-react'
+import {
+  User, Users, Palette, Bell, Trophy, CalendarDays,
+  Shield, CreditCard, Info, ChevronRight, Camera,
+  Copy, Check, Trash2, Plus, Edit2, X, Save,
+  Download, LogOut, Smartphone, Eye, EyeOff,
+  Globe, Clock, Hash, Link2, Share2
+} from 'lucide-react'
 import { useMembersStore, type Member } from '@/hooks/useMembersStore'
 import { MemberAvatar } from '@/components/shared/MemberAvatar'
+import { Toggle } from '@/components/shared/Toggle'
 import { EmojiPicker } from '@/components/shared/EmojiPicker'
 import type { AppSettings } from '@/types/app.types'
 import toast from 'react-hot-toast'
 
+type SectionId =
+  'profile' | 'family' | 'appearance' | 'notifications' |
+  'gamification' | 'calendar' | 'security' | 'subscription' | 'about'
+
+const NAV: { id: SectionId; icon: React.ElementType; label: string; emoji: string }[] = [
+  { id:'profile',       icon:User,         label:'Perfil',               emoji:'👤' },
+  { id:'family',        icon:Users,        label:'Familia',              emoji:'👨‍👩‍👧' },
+  { id:'appearance',    icon:Palette,      label:'Apariencia',           emoji:'🎨' },
+  { id:'notifications', icon:Bell,         label:'Notificaciones',       emoji:'🔔' },
+  { id:'gamification',  icon:Trophy,       label:'Gamificación',         emoji:'🏆' },
+  { id:'calendar',      icon:CalendarDays, label:'Calendario',           emoji:'📅' },
+  { id:'security',      icon:Shield,       label:'Seguridad',            emoji:'🔒' },
+  { id:'subscription',  icon:CreditCard,   label:'Plan',                 emoji:'💳' },
+  { id:'about',         icon:Info,         label:'Acerca de',            emoji:'ℹ️' },
+]
+
+const THEMES = [
+  { id:'default', label:'Default', colors:['#007AFF','#5856D6'] },
+  { id:'ocean',   label:'Ocean',   colors:['#00C7BE','#30B0C7'] },
+  { id:'forest',  label:'Forest',  colors:['#34C759','#30D158'] },
+  { id:'sunset',  label:'Sunset',  colors:['#FF9500','#FF6B00'] },
+  { id:'candy',   label:'Candy',   colors:['#FF2D55','#FF375F'] },
+  { id:'midnight',label:'Midnight',colors:['#5856D6','#AF52DE'] },
+]
+const ACCENT_COLORS = ['#007AFF','#34C759','#FF3B30','#FF9500','#AF52DE','#5856D6','#FF2D55','#00C7BE','#FFCC00','#30B0C7','#FF6B00','#30D158']
+const TIMEZONES = ['America/New_York','America/Chicago','America/Denver','America/Los_Angeles','America/Bogota','America/Lima','America/Santiago','Europe/Madrid','Europe/London','Europe/Paris']
 const COLOR_OPTIONS = [
-  { bg:'#FFE4E6', text:'#9F1239', bar:'#FB7185', name:'Rose'   },
-  { bg:'#E0F2FE', text:'#075985', bar:'#38BDF8', name:'Sky'    },
-  { bg:'#F3E8FF', text:'#6B21A8', bar:'#C084FC', name:'Purple' },
-  { bg:'#DCFCE7', text:'#166534', bar:'#4ADE80', name:'Green'  },
-  { bg:'#FEF3C7', text:'#92400E', bar:'#FCD34D', name:'Yellow' },
-  { bg:'#FFEDD5', text:'#9A3412', bar:'#FB923C', name:'Orange' },
-  { bg:'#E0E7FF', text:'#3730A3', bar:'#818CF8', name:'Indigo' },
-  { bg:'#CCFBF1', text:'#134E4A', bar:'#2DD4BF', name:'Teal'  },
+  { bg:'#FFE4E6',text:'#9F1239',bar:'#FB7185' },
+  { bg:'#E0F2FE',text:'#075985',bar:'#38BDF8' },
+  { bg:'#F3E8FF',text:'#6B21A8',bar:'#C084FC' },
+  { bg:'#DCFCE7',text:'#166534',bar:'#4ADE80' },
+  { bg:'#FEF3C7',text:'#92400E',bar:'#FCD34D' },
+  { bg:'#FFEDD5',text:'#9A3412',bar:'#FB923C' },
+  { bg:'#E0E7FF',text:'#3730A3',bar:'#818CF8' },
+  { bg:'#CCFBF1',text:'#134E4A',bar:'#2DD4BF' },
 ]
 
 interface SettingsViewProps {
@@ -24,335 +57,732 @@ interface SettingsViewProps {
 }
 
 export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
-  const { members, addMember, updateMember, removeMember, uploadPhoto, removePhoto } = useMembersStore()
+  const [active, setActive] = useState<SectionId>('profile')
+  const { members, addMember, updateMember, removeMember, uploadPhoto } = useMembersStore()
 
-  // Local draft state — changes apply only on Save
-  const [draft, setDraft] = useState<AppSettings>(settings)
-  const [isDirty, setIsDirty] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editName, setEditName] = useState('')
-  const [showAddMember, setShowAddMember] = useState(false)
-  const [showEmojiFor, setShowEmojiFor] = useState<string | null>(null)
-
-  // New member form
-  const [newForm, setNewForm] = useState({ name:'', emoji:'👤', colorIdx:0, role:'child' as 'adult'|'child' })
-
+  // Profile
+  const [profileForm, setProfileForm] = useState({ name: settings.familyName || '', phone:'', timezone:'America/New_York', language:'es', dateFormat:'MM/DD/YYYY', timeFormat:'12h' })
   const fileRefs = useRef<Record<string, HTMLInputElement>>({})
 
-  const updateDraft = (patch: Partial<AppSettings>) => {
-    setDraft(d => ({ ...d, ...patch }))
-    setIsDirty(true)
-  }
+  // Appearance
+  const [appTheme, setAppTheme] = useState('default')
+  const [accentColor, setAccentColor] = useState('#007AFF')
+  const [fontSize, setFontSize] = useState('normal')
+  const [calDensity, setCalDensity] = useState('normal')
 
-  function handleSave() {
-    onUpdate(draft)
-    setIsDirty(false)
-    toast.success('Settings saved! ✅', { duration: 2000 })
-  }
+  // Notifications
+  const [notifMaster, setNotifMaster] = useState(settings.notifications)
+  const [notifTypes, setNotifTypes] = useState({
+    taskReminder:true, taskDone:true, newEvent:true,
+    chat:false, achievement:true, reward:true,
+  })
+  const [silentHours, setSilentHours] = useState(false)
+  const [silentFrom, setSilentFrom] = useState('22:00')
+  const [silentTo, setSilentTo] = useState('07:00')
+
+  // Family
+  const [showAddMember, setShowAddMember] = useState(false)
+  const [editingId, setEditingId] = useState<string|null>(null)
+  const [editName, setEditName] = useState('')
+  const [newMemberForm, setNewMemberForm] = useState({ name:'', emoji:'👤', colorIdx:0, role:'child' as 'adult'|'child' })
+  const [copied, setCopied] = useState(false)
+  const [showEmojiFor, setShowEmojiFor] = useState<string|null>(null)
+
+  // Security
+  const [pwForm, setPwForm] = useState({ current:'', next:'', confirm:'' })
+  const [showPw, setShowPw] = useState(false)
+  const [pinForm, setPinForm] = useState({ pin:'', confirm:'' })
+  const [deleteConfirm, setDeleteConfirm] = useState('')
+  const [twoFAEnabled, setTwoFAEnabled] = useState(false)
 
   function handlePhotoUpload(memberId: string, file: File) {
     const reader = new FileReader()
-    reader.onload = e => {
-      const dataUrl = e.target?.result as string
-      uploadPhoto(memberId, dataUrl)
-      toast.success('Photo updated! 📸', { duration: 1500 })
-    }
+    reader.onload = e => { uploadPhoto(memberId, e.target?.result as string); toast.success('Foto actualizada 📸') }
     reader.readAsDataURL(file)
   }
 
-  function handleAddMember() {
-    if (!newForm.name.trim()) return
-    const c = COLOR_OPTIONS[newForm.colorIdx]
-    addMember({ name: newForm.name.trim(), emoji: newForm.emoji, bgColor: c.bg, textColor: c.text, barColor: c.bar, role: newForm.role })
-    setNewForm({ name:'', emoji:'👤', colorIdx:0, role:'child' })
-    setShowAddMember(false)
-    toast.success(`${newForm.name} added! 👋`)
+  function copyInviteCode() {
+    navigator.clipboard.writeText(settings.familyName || 'DEMO1234')
+    setCopied(true); toast.success('Código copiado')
+    setTimeout(() => setCopied(false), 2000)
   }
 
-  const Section = ({ icon:Icon, title, children }: { icon:React.ElementType; title:string; children:React.ReactNode }) => (
-    <div style={{ marginBottom:20, background:'var(--surface)', borderRadius:16, border:'1px solid var(--border)', overflow:'hidden' }}>
-      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'14px 20px', borderBottom:'1px solid var(--border)', background:'var(--bg)' }}>
-        <Icon size={16} color="var(--blue)" strokeWidth={2}/>
-        <h2 style={{ fontSize:14, fontWeight:700, fontFamily:'Inter', color:'var(--text-1)' }}>{title}</h2>
-      </div>
-      <div style={{ padding:'16px 20px' }}>{children}</div>
-    </div>
-  )
+  function shareWhatsApp() {
+    const msg = encodeURIComponent(`Únete a nuestra familia en FamilyQuest! Código: ${settings.familyName}`)
+    window.open(`https://wa.me/?text=${msg}`, '_blank')
+  }
 
-  const Row = ({ label, sub, children }: { label:string; sub?:string; children:React.ReactNode }) => (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingBottom:14, marginBottom:14, borderBottom:'1px solid var(--border)' }}>
-      <div>
-        <span style={{ fontSize:14, fontWeight:500, fontFamily:'Inter', color:'var(--text-1)' }}>{label}</span>
-        {sub && <p style={{ fontSize:11, color:'var(--text-3)', fontFamily:'Inter', marginTop:2 }}>{sub}</p>}
+  function saveProfile() {
+    onUpdate({ familyName: profileForm.name, timeFormat: profileForm.timeFormat as any })
+    toast.success('Perfil guardado ✅')
+  }
+
+  // ── Row component ──
+  const Row = ({ label, sub, children }: { label:string; sub?:string; children?:React.ReactNode }) => (
+    <div className="settings-row">
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-sm" style={{ color:'var(--text-1)' }}>{label}</p>
+        {sub && <p className="text-xs mt-0.5" style={{ color:'var(--text-3)' }}>{sub}</p>}
       </div>
       {children}
     </div>
   )
 
-  const Toggle = ({ value, onChange }: { value:boolean; onChange:(v:boolean)=>void }) => (
-    <motion.button onClick={() => onChange(!value)}
-      style={{ width:44, height:24, borderRadius:12, background:value?'var(--blue)':'var(--border)', border:'none', cursor:'pointer', position:'relative', transition:'background 200ms', flexShrink:0 }}>
-      <motion.div animate={{ x:value?22:2 }} transition={{ type:'spring', stiffness:500, damping:30 }}
-        style={{ width:20, height:20, borderRadius:'50%', background:'#fff', position:'absolute', top:2, boxShadow:'0 1px 4px rgba(0,0,0,0.15)' }}/>
-    </motion.button>
+  const SectionCard = ({ children }: { children:React.ReactNode }) => (
+    <div className="card p-5 mb-4">{children}</div>
   )
 
-  const Pill = ({ options, value, onChange }: { options:{v:string;l:string}[]; value:string; onChange:(v:string)=>void }) => (
-    <div style={{ display:'flex', gap:6 }}>
-      {options.map(opt=>(
-        <button key={opt.v} onClick={() => onChange(opt.v)}
-          style={{ padding:'6px 14px', borderRadius:8, border:`1.5px solid ${value===opt.v?'var(--blue)':'var(--border)'}`, background:value===opt.v?'var(--blue-bg)':'transparent', color:value===opt.v?'var(--blue)':'var(--text-2)', fontSize:12, fontWeight:600, fontFamily:'Inter', cursor:'pointer' }}>
-          {opt.l}
-        </button>
-      ))}
-    </div>
-  )
-
-  return (
-    <div style={{ display:'flex', flexDirection:'column', height:'100%', background:'var(--bg)' }}>
-      {/* Header with Save */}
-      <div style={{ padding:'16px 24px 14px', background:'var(--surface)', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-        <div>
-          <h1 style={{ fontSize:22, fontWeight:700, fontFamily:'Inter', color:'var(--text-1)' }}>Settings</h1>
-          <p style={{ fontSize:13, color:'var(--text-3)', fontFamily:'Inter', marginTop:2 }}>Customize your FamilyQuest experience</p>
-        </div>
-        <AnimatePresence>
-          {isDirty && (
-            <motion.button initial={{ opacity:0, scale:0.9 }} animate={{ opacity:1, scale:1 }} exit={{ opacity:0, scale:0.9 }}
-              onClick={handleSave} whileTap={{ scale:0.96 }}
-              style={{ display:'flex', alignItems:'center', gap:8, background:'var(--blue)', color:'#fff', borderRadius:14, padding:'10px 20px', fontSize:14, fontWeight:700, fontFamily:'Inter', border:'none', cursor:'pointer', boxShadow:'0 4px 14px rgba(79,70,229,0.35)' }}>
-              <Save size={16}/> Save Changes
-            </motion.button>
-          )}
-        </AnimatePresence>
-      </div>
-
-      <div style={{ flex:1, overflowY:'auto', padding:'20px 24px' }}>
-
-        {/* FAMILY PROFILE */}
-        <Section icon={Globe} title="Family Profile">
-          <Row label="Family Name">
-            <input value={draft.familyName} onChange={e=>updateDraft({familyName:e.target.value})}
-              style={{ padding:'8px 14px', borderRadius:10, border:'1.5px solid var(--border)', fontSize:14, fontFamily:'Inter', background:'var(--bg)', color:'var(--text-1)', outline:'none', width:220, textAlign:'right' }}/>
-          </Row>
-          <Row label="Location">
-            <input value={draft.location} onChange={e=>updateDraft({location:e.target.value})}
-              style={{ padding:'8px 14px', borderRadius:10, border:'1.5px solid var(--border)', fontSize:14, fontFamily:'Inter', background:'var(--bg)', color:'var(--text-1)', outline:'none', width:220, textAlign:'right' }}/>
-          </Row>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <span style={{ fontSize:14, fontWeight:500, fontFamily:'Inter', color:'var(--text-1)' }}>Week Starts On</span>
-            <Pill options={[{v:'sunday',l:'Sunday'},{v:'monday',l:'Monday'}]} value={draft.weekStartsOn} onChange={v=>updateDraft({weekStartsOn:v as 'sunday'|'monday'})}/>
+  const sections: Record<SectionId, React.ReactNode> = {
+    // ── PROFILE ──
+    profile: (
+      <div>
+        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>👤 Perfil</h1>
+        <SectionCard>
+          <div className="flex items-center gap-4 mb-5">
+            <div className="relative">
+              <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl"
+                style={{ background:'rgba(0,122,255,0.1)', border:'2px solid var(--border)' }}>
+                {members[0]?.emoji || '😊'}
+              </div>
+              <button onClick={() => toast('Próximamente: subir foto de perfil')}
+                className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full flex items-center justify-center"
+                style={{ background:'var(--blue)', color:'#fff' }}>
+                <Camera size={14} />
+              </button>
+            </div>
+            <div>
+              <p className="font-black text-lg" style={{ fontFamily:'var(--font-heading)' }}>{profileForm.name || 'Tu nombre'}</p>
+              <p className="text-sm" style={{ color:'var(--text-3)' }}>Administrador familiar</p>
+            </div>
           </div>
-        </Section>
 
-        {/* FAMILY MEMBERS */}
-        <Section icon={Users} title="Family Members">
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider mb-1.5 block" style={{ color:'var(--text-3)' }}>Nombre</label>
+              <input value={profileForm.name} onChange={e => setProfileForm(f=>({...f,name:e.target.value}))}
+                className="input-apple" placeholder="Tu nombre completo" />
+            </div>
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider mb-1.5 block" style={{ color:'var(--text-3)' }}>Teléfono</label>
+              <input value={profileForm.phone} onChange={e => setProfileForm(f=>({...f,phone:e.target.value}))}
+                className="input-apple" placeholder="+1 (555) 000-0000" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider mb-1.5 block" style={{ color:'var(--text-3)' }}>Idioma</label>
+                <select value={profileForm.language} onChange={e => setProfileForm(f=>({...f,language:e.target.value}))}
+                  className="input-apple">
+                  <option value="es">🇪🇸 Español</option>
+                  <option value="en">🇺🇸 English</option>
+                  <option value="fr">🇫🇷 Français</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider mb-1.5 block" style={{ color:'var(--text-3)' }}>Hora</label>
+                <select value={profileForm.timeFormat} onChange={e => setProfileForm(f=>({...f,timeFormat:e.target.value}))}
+                  className="input-apple">
+                  <option value="12h">12h (AM/PM)</option>
+                  <option value="24h">24h</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider mb-1.5 block" style={{ color:'var(--text-3)' }}>Zona horaria</label>
+              <select value={profileForm.timezone} onChange={e => setProfileForm(f=>({...f,timezone:e.target.value}))}
+                className="input-apple">
+                {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz.replace('_',' ')}</option>)}
+              </select>
+            </div>
+          </div>
+        </SectionCard>
+        <motion.button whileTap={{ scale:0.97 }} onClick={saveProfile}
+          className="btn btn-primary w-full" style={{ padding:'14px', fontSize:16 }}>
+          <Save size={16} /> Guardar cambios
+        </motion.button>
+      </div>
+    ),
+
+    // ── FAMILY ──
+    family: (
+      <div>
+        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>👨‍👩‍👧 Familia</h1>
+
+        {/* Invite code */}
+        <SectionCard>
+          <p className="font-bold text-sm mb-1" style={{ fontFamily:'var(--font-heading)' }}>Código de invitación</p>
+          <p className="text-xs mb-3" style={{ color:'var(--text-3)' }}>Compártelo para que otros se unan</p>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 px-4 py-3 rounded-2xl font-mono font-bold text-xl tracking-widest text-center"
+              style={{ background:'rgba(0,122,255,0.08)', color:'var(--blue)', border:'1.5px solid rgba(0,122,255,0.2)' }}>
+              {settings.familyName?.slice(0,8).toUpperCase() || 'FAMQUEST'}
+            </div>
+            <button onClick={copyInviteCode} className="btn-icon" title="Copiar">
+              {copied ? <Check size={18} style={{ color:'var(--green)' }} /> : <Copy size={18} />}
+            </button>
+            <button onClick={shareWhatsApp} className="btn-icon" title="Compartir por WhatsApp"
+              style={{ background:'#25D366', color:'#fff', border:'none' }}>
+              <Share2 size={18} />
+            </button>
+          </div>
+        </SectionCard>
+
+        {/* Members */}
+        <SectionCard>
+          <div className="flex items-center justify-between mb-4">
+            <p className="font-bold" style={{ fontFamily:'var(--font-heading)' }}>Miembros ({members.length})</p>
+            <button onClick={() => setShowAddMember(true)} className="btn btn-primary" style={{ padding:'8px 16px', fontSize:13 }}>
+              <Plus size={14} /> Agregar
+            </button>
+          </div>
+
           {members.map(m => (
-            <div key={m.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 0', borderBottom:'1px solid var(--border)' }}>
-              {/* Avatar + photo upload */}
-              <div style={{ position:'relative', flexShrink:0 }}>
-                <MemberAvatar member={m} size={50}/>
-                <button
-                  onClick={() => fileRefs.current[m.id]?.click()}
-                  title="Upload photo"
-                  style={{ position:'absolute', bottom:-2, right:-2, width:20, height:20, borderRadius:'50%', background:'var(--blue)', border:'2px solid var(--surface)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff' }}>
-                  <Camera size={10}/>
+            <div key={m.id} className="flex items-center gap-3 py-3 border-b last:border-0" style={{ borderColor:'var(--border)' }}>
+              <div className="relative">
+                <MemberAvatar member={m} size={46} />
+                <button onClick={() => fileRefs.current[m.id]?.click()}
+                  className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
+                  style={{ background:'var(--blue)', color:'#fff' }}>
+                  <Camera size={10} />
                 </button>
                 <input ref={el=>{ if(el) fileRefs.current[m.id]=el }} type="file" accept="image/*" style={{ display:'none' }}
-                  onChange={e=>{ const f=e.target.files?.[0]; if(f) handlePhotoUpload(m.id,f) }}/>
+                  onChange={e => { const f=e.target.files?.[0]; if(f) handlePhotoUpload(m.id,f) }} />
               </div>
 
-              {editingId===m.id ? (
-                <div style={{ flex:1, display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-                  {/* Emoji picker */}
-                  <div style={{ position:'relative' }}>
-                    <button onClick={() => setShowEmojiFor(showEmojiFor===m.id?null:m.id)}
-                      style={{ width:38, height:38, borderRadius:8, border:'1.5px solid var(--border)', background:'var(--bg)', fontSize:20, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                      {m.emoji}
-                    </button>
-                    <AnimatePresence>
-                      {showEmojiFor===m.id && (
-                        <motion.div initial={{ opacity:0, scale:0.95 }} animate={{ opacity:1, scale:1 }} exit={{ opacity:0, scale:0.95 }}
-                          style={{ position:'absolute', top:'110%', left:0, zIndex:99 }}>
-                          <EmojiPicker value={m.emoji} onChange={e=>{ updateMember(m.id,{emoji:e}); setShowEmojiFor(null) }} onClose={()=>setShowEmojiFor(null)}/>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
+              {editingId === m.id ? (
+                <div className="flex-1 flex gap-2">
                   <input value={editName} onChange={e=>setEditName(e.target.value)} autoFocus
-                    style={{ flex:1, minWidth:100, padding:'8px 12px', borderRadius:8, border:'1.5px solid var(--blue)', fontSize:14, fontFamily:'Inter', outline:'none' }}/>
-                  <div style={{ display:'flex', gap:4 }}>
-                    {COLOR_OPTIONS.map((c,i)=>(
-                      <button key={i} onClick={()=>updateMember(m.id,{bgColor:c.bg,textColor:c.text,barColor:c.bar})}
-                        style={{ width:22, height:22, borderRadius:'50%', background:c.bar, border:`3px solid ${m.barColor===c.bar?'var(--text-1)':'transparent'}`, cursor:'pointer' }}/>
-                    ))}
-                  </div>
-                  <select value={m.role} onChange={e=>updateMember(m.id,{role:e.target.value as 'adult'|'child'})}
-                    style={{ padding:'7px 10px', borderRadius:8, border:'1px solid var(--border)', fontSize:13, fontFamily:'Inter', background:'var(--surface)', cursor:'pointer', outline:'none' }}>
-                    <option value="adult">Adult</option>
-                    <option value="child">Child</option>
-                  </select>
-                  <button onClick={()=>{ updateMember(m.id,{name:editName}); setEditingId(null) }}
-                    style={{ width:32, height:32, borderRadius:8, background:'var(--blue)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff' }}><Check size={14}/></button>
-                  <button onClick={()=>setEditingId(null)}
-                    style={{ width:32, height:32, borderRadius:8, background:'var(--bg)', border:'1px solid var(--border)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-3)' }}><X size={14}/></button>
+                    className="input-apple flex-1" style={{ padding:'8px 12px', fontSize:14 }} />
+                  <button onClick={() => { updateMember(m.id,{name:editName}); setEditingId(null); toast.success('Guardado') }}
+                    className="btn-icon" style={{ color:'var(--green)' }}><Check size={16} /></button>
+                  <button onClick={() => setEditingId(null)} className="btn-icon"><X size={16} /></button>
                 </div>
               ) : (
                 <>
-                  <div style={{ flex:1 }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                      <p style={{ fontSize:15, fontWeight:700, fontFamily:'Inter', color:'var(--text-1)' }}>{m.name}</p>
-                      <span style={{ fontSize:10, fontWeight:600, color:m.textColor, background:m.bgColor, padding:'2px 8px', borderRadius:20, textTransform:'uppercase', letterSpacing:'0.04em' }}>{m.role}</span>
-                    </div>
-                    <div style={{ display:'flex', gap:8, marginTop:4, alignItems:'center' }}>
-                      {m.photoDataUrl ? (
-                        <button onClick={()=>removePhoto(m.id)}
-                          style={{ fontSize:11, color:'var(--text-3)', fontFamily:'Inter', background:'transparent', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:3 }}>
-                          <X size={10}/> Remove photo
-                        </button>
-                      ) : (
-                        <button onClick={()=>fileRefs.current[m.id]?.click()}
-                          style={{ fontSize:11, color:'var(--blue)', fontFamily:'Inter', background:'transparent', border:'none', cursor:'pointer', display:'flex', alignItems:'center', gap:3 }}>
-                          <Upload size={10}/> Upload photo
-                        </button>
-                      )}
+                  <div className="flex-1">
+                    <p className="font-bold text-sm">{m.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs capitalize px-2 py-0.5 rounded-full font-semibold"
+                        style={{ background:m.bgColor, color:m.textColor }}>{m.role}</span>
+                      <span className="text-xs" style={{ color:'var(--text-3)' }}>⭐ pts</span>
                     </div>
                   </div>
-                  <div style={{ display:'flex', gap:4 }}>
-                    <button onClick={()=>{ setEditingId(m.id); setEditName(m.name) }}
-                      style={{ width:32, height:32, borderRadius:8, border:'1px solid var(--border)', background:'var(--bg)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-2)' }}><Edit2 size={13}/></button>
-                    <button onClick={()=>{ if(confirm(`Remove ${m.name}?`)) removeMember(m.id) }}
-                      style={{ width:32, height:32, borderRadius:8, border:'none', background:'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text-3)' }}><Trash2 size={13}/></button>
+                  <div className="flex gap-1.5">
+                    {/* Color selector dots */}
+                    <div className="relative">
+                      <button onClick={() => setShowEmojiFor(showEmojiFor===m.id?null:m.id)}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-lg"
+                        style={{ background:'var(--bg)', border:'1px solid var(--border)' }}>
+                        {m.emoji}
+                      </button>
+                      <AnimatePresence>
+                        {showEmojiFor===m.id && (
+                          <motion.div initial={{ opacity:0,scale:0.95 }} animate={{ opacity:1,scale:1 }} exit={{ opacity:0,scale:0.95 }}
+                            style={{ position:'absolute', top:'110%', right:0, zIndex:99 }}>
+                            <EmojiPicker value={m.emoji} onChange={e => { updateMember(m.id,{emoji:e}); setShowEmojiFor(null) }} onClose={() => setShowEmojiFor(null)} />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                    <button onClick={() => { setEditingId(m.id); setEditName(m.name) }} className="btn-icon">
+                      <Edit2 size={14} />
+                    </button>
+                    <button onClick={() => { if(confirm(`¿Eliminar a ${m.name}?`)) removeMember(m.id) }}
+                      className="btn-icon" style={{ color:'var(--red)' }}>
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </>
               )}
             </div>
           ))}
+        </SectionCard>
 
-          {/* Add member form */}
-          <AnimatePresence>
-            {showAddMember && (
-              <motion.div initial={{ opacity:0, height:0 }} animate={{ opacity:1, height:'auto' }} exit={{ opacity:0, height:0 }} style={{ overflow:'hidden', marginTop:12 }}>
-                <div style={{ padding:16, borderRadius:14, background:'var(--blue-bg)', border:'1px solid rgba(79,70,229,0.2)', display:'flex', flexDirection:'column', gap:12 }}>
-                  <h3 style={{ fontSize:13, fontWeight:700, fontFamily:'Inter', color:'var(--text-1)', marginBottom:2 }}>New Member</h3>
-                  <div style={{ display:'flex', gap:10, alignItems:'center' }}>
-                    {/* Emoji */}
-                    <div style={{ position:'relative' }}>
-                      <button onClick={()=>setShowEmojiFor(showEmojiFor==='new'?null:'new')}
-                        style={{ width:44, height:44, borderRadius:10, border:'1.5px solid var(--border)', background:'var(--surface)', fontSize:24, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                        {newForm.emoji}
+        {/* Add member form */}
+        <AnimatePresence>
+          {showAddMember && (
+            <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+              className="modal-overlay" onClick={e => e.target===e.currentTarget && setShowAddMember(false)}>
+              <motion.div initial={{ y:60,opacity:0 }} animate={{ y:0,opacity:1 }} exit={{ y:60,opacity:0 }}
+                transition={{ type:'spring',stiffness:340,damping:30 }} className="modal-sheet">
+                <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mb-4" />
+                <h2 className="font-black text-xl mb-4" style={{ fontFamily:'var(--font-heading)' }}>Agregar miembro</h2>
+                <div className="flex flex-col gap-4">
+                  <div className="flex gap-3 items-center">
+                    <div className="relative">
+                      <button onClick={() => setShowEmojiFor('new')}
+                        className="card w-14 h-14 flex items-center justify-center text-3xl">
+                        {newMemberForm.emoji}
                       </button>
                       <AnimatePresence>
                         {showEmojiFor==='new' && (
-                          <motion.div initial={{ opacity:0, scale:0.95 }} animate={{ opacity:1, scale:1 }} exit={{ opacity:0, scale:0.95 }}
-                            style={{ position:'absolute', top:'110%', left:0, zIndex:99 }}>
-                            <EmojiPicker value={newForm.emoji} onChange={e=>{ setNewForm(f=>({...f,emoji:e})); setShowEmojiFor(null) }} onClose={()=>setShowEmojiFor(null)}/>
+                          <motion.div initial={{ opacity:0,scale:0.95 }} animate={{ opacity:1,scale:1 }} exit={{ opacity:0,scale:0.95 }}
+                            style={{ position:'absolute',top:'110%',left:0,zIndex:99 }}>
+                            <EmojiPicker value={newMemberForm.emoji} onChange={e=>{setNewMemberForm(f=>({...f,emoji:e}));setShowEmojiFor(null)}} onClose={()=>setShowEmojiFor(null)} />
                           </motion.div>
                         )}
                       </AnimatePresence>
                     </div>
-                    <input value={newForm.name} onChange={e=>setNewForm(f=>({...f,name:e.target.value}))} placeholder="Name..." autoFocus
-                      style={{ flex:1, padding:'10px 14px', borderRadius:10, border:'1.5px solid var(--border)', fontSize:14, fontFamily:'Inter', background:'var(--surface)', outline:'none' }}/>
-                    <select value={newForm.role} onChange={e=>setNewForm(f=>({...f,role:e.target.value as 'adult'|'child'}))}
-                      style={{ padding:'10px 12px', borderRadius:10, border:'1.5px solid var(--border)', fontSize:13, fontFamily:'Inter', background:'var(--surface)', cursor:'pointer', outline:'none' }}>
-                      <option value="adult">Adult</option>
-                      <option value="child">Child</option>
-                    </select>
+                    <input value={newMemberForm.name} onChange={e=>setNewMemberForm(f=>({...f,name:e.target.value}))}
+                      placeholder="Nombre del miembro" autoFocus className="input-apple flex-1" />
                   </div>
-                  {/* Color selector */}
+                  <div className="flex gap-2">
+                    {[{v:'adult',l:'👨 Adulto'},{v:'child',l:'👦 Niño/a'}].map(opt=>(
+                      <button key={opt.v} onClick={()=>setNewMemberForm(f=>({...f,role:opt.v as any}))}
+                        className="flex-1 py-3 rounded-2xl font-bold text-sm transition-all"
+                        style={{ background:newMemberForm.role===opt.v?'rgba(0,122,255,0.1)':'var(--bg)', color:newMemberForm.role===opt.v?'var(--blue)':'var(--text-2)', border:`2px solid ${newMemberForm.role===opt.v?'var(--blue)':'var(--border)'}` }}>
+                        {opt.l}
+                      </button>
+                    ))}
+                  </div>
                   <div>
-                    <p style={{ fontSize:11, fontWeight:600, color:'var(--text-3)', fontFamily:'Inter', marginBottom:8, textTransform:'uppercase', letterSpacing:'0.06em' }}>Color Theme</p>
-                    <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                    <label className="text-xs font-bold uppercase tracking-wider mb-2 block" style={{ color:'var(--text-3)' }}>Color</label>
+                    <div className="flex gap-2 flex-wrap">
                       {COLOR_OPTIONS.map((c,i)=>(
-                        <button key={i} onClick={()=>setNewForm(f=>({...f,colorIdx:i}))}
-                          style={{ width:32, height:32, borderRadius:'50%', background:c.bar, border:`3px solid ${newForm.colorIdx===i?'var(--text-1)':'transparent'}`, cursor:'pointer', boxShadow:newForm.colorIdx===i?'0 0 0 2px var(--surface)':undefined }}
-                          title={c.name}/>
+                        <button key={i} onClick={()=>setNewMemberForm(f=>({...f,colorIdx:i}))}
+                          title={`Color ${i+1}`}
+                          style={{ width:28,height:28,borderRadius:'50%',background:c.bar,border:`3px solid ${newMemberForm.colorIdx===i?'var(--text-1)':'transparent'}`,boxShadow:newMemberForm.colorIdx===i?`0 0 0 2px var(--surface)`:undefined }} />
                       ))}
                     </div>
                   </div>
-                  <div style={{ display:'flex', gap:8 }}>
-                    <motion.button whileTap={{ scale:0.95 }} onClick={handleAddMember} disabled={!newForm.name.trim()}
-                      style={{ flex:1, padding:'10px', borderRadius:10, background:newForm.name.trim()?'var(--blue)':'var(--border)', color:'#fff', border:'none', fontSize:14, fontWeight:700, fontFamily:'Inter', cursor:newForm.name.trim()?'pointer':'default' }}>
-                      Add Member
-                    </motion.button>
-                    <button onClick={()=>setShowAddMember(false)}
-                      style={{ padding:'10px 18px', borderRadius:10, background:'transparent', border:'1px solid var(--border)', fontSize:14, fontFamily:'Inter', cursor:'pointer', color:'var(--text-2)' }}>Cancel</button>
-                  </div>
+                  <motion.button whileTap={{scale:0.97}} onClick={()=>{
+                    if(!newMemberForm.name.trim()) return
+                    const c=COLOR_OPTIONS[newMemberForm.colorIdx]
+                    addMember({name:newMemberForm.name.trim(),emoji:newMemberForm.emoji,bgColor:c.bg,textColor:c.text,barColor:c.bar,role:newMemberForm.role})
+                    setNewMemberForm({name:'',emoji:'👤',colorIdx:0,role:'child'})
+                    setShowAddMember(false)
+                    toast.success('Miembro agregado 👋')
+                  }} className="btn btn-primary w-full" style={{ padding:'14px',fontSize:16 }}>
+                    Agregar miembro
+                  </motion.button>
                 </div>
               </motion.div>
-            )}
-          </AnimatePresence>
-
-          {!showAddMember && (
-            <button onClick={()=>setShowAddMember(true)}
-              style={{ display:'flex', alignItems:'center', gap:6, marginTop:12, padding:'10px 16px', borderRadius:12, border:'1.5px dashed var(--border)', background:'transparent', color:'var(--text-3)', fontSize:13, fontWeight:600, fontFamily:'Inter', cursor:'pointer', width:'100%', justifyContent:'center' }}>
-              <Plus size={14}/> Add Family Member
-            </button>
+            </motion.div>
           )}
-        </Section>
+        </AnimatePresence>
+      </div>
+    ),
 
-        {/* PREFERENCES */}
-        <Section icon={Clock} title="Preferences">
-          <Row label="Time Format" sub="How times are displayed">
-            <Pill options={[{v:'12h',l:'12h'},{v:'24h',l:'24h'}]} value={draft.timeFormat} onChange={v=>updateDraft({timeFormat:v as '12h'|'24h'})}/>
-          </Row>
-          <Row label="Temperature Unit" sub="Weather display">
-            <Pill options={[{v:'F',l:'°F'},{v:'C',l:'°C'}]} value={draft.temperatureUnit} onChange={v=>updateDraft({temperatureUnit:v as 'F'|'C'})}/>
-          </Row>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <div>
-              <span style={{ fontSize:14, fontWeight:500, fontFamily:'Inter', color:'var(--text-1)' }}>Notifications</span>
-              <p style={{ fontSize:11, color:'var(--text-3)', fontFamily:'Inter', marginTop:2 }}>Get reminders for events and tasks</p>
-            </div>
-            <Toggle value={draft.notifications} onChange={v=>updateDraft({notifications:v})}/>
-          </div>
-        </Section>
+    // ── APPEARANCE ──
+    appearance: (
+      <div>
+        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>🎨 Apariencia</h1>
 
-        {/* APPEARANCE */}
-        <Section icon={Palette} title="Appearance">
-          <p style={{ fontSize:12, color:'var(--text-3)', fontFamily:'Inter', marginBottom:12 }}>Choose your preferred color theme</p>
-          <div style={{ display:'flex', gap:10 }}>
-            {[{id:'light',icon:'☀️',label:'Light'},{id:'dark',icon:'🌙',label:'Dark'},{id:'system',icon:'💻',label:'System'}].map(t=>(
-              <button key={t.id} onClick={()=>updateDraft({theme:t.id as 'light'|'dark'|'system'})}
-                style={{ flex:1, padding:'14px 8px', borderRadius:14, border:`2px solid ${draft.theme===t.id?'var(--blue)':'var(--border)'}`, background:draft.theme===t.id?'var(--blue-bg)':'var(--bg)', cursor:'pointer', display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
-                <span style={{ fontSize:28 }}>{t.icon}</span>
-                <span style={{ fontSize:12, fontWeight:700, fontFamily:'Inter', color:draft.theme===t.id?'var(--blue)':'var(--text-2)' }}>{t.label}</span>
+        <SectionCard>
+          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)' }}>Modo de color</p>
+          <div className="flex gap-2">
+            {[{v:'light',l:'☀️ Claro'},{v:'dark',l:'🌙 Oscuro'},{v:'system',l:'💻 Sistema'}].map(opt=>(
+              <button key={opt.v} className="flex-1 py-2.5 rounded-2xl font-bold text-sm transition-all"
+                style={{ background:appTheme==='default'&&opt.v==='light'?'rgba(0,122,255,0.1)':'var(--bg)', color:appTheme==='default'&&opt.v==='light'?'var(--blue)':'var(--text-2)', border:`1.5px solid ${appTheme==='default'&&opt.v==='light'?'var(--blue)':'var(--border)'}` }}>
+                {opt.l}
               </button>
             ))}
           </div>
-        </Section>
+        </SectionCard>
 
-        {/* DATA */}
-        <Section icon={Shield} title="Data & Privacy">
-          <Row label="Export Backup" sub="Download all your data as JSON">
-            <button onClick={()=>{ const d=JSON.stringify({settings,members},null,2); const b=new Blob([d],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='familyquest-backup.json'; a.click(); toast.success('Backup downloaded!') }}
-              style={{ padding:'8px 16px', borderRadius:10, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text-2)', fontSize:13, fontWeight:600, fontFamily:'Inter', cursor:'pointer' }}>
-              Download
-            </button>
-          </Row>
-          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <div>
-              <span style={{ fontSize:14, fontWeight:500, fontFamily:'Inter', color:'#EF4444' }}>Reset All Data</span>
-              <p style={{ fontSize:11, color:'var(--text-3)', fontFamily:'Inter', marginTop:2 }}>Clears everything — cannot be undone</p>
+        <SectionCard>
+          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)' }}>Temas prediseñados</p>
+          <div className="grid grid-cols-3 gap-2">
+            {THEMES.map(t=>(
+              <button key={t.id} onClick={() => { setAppTheme(t.id); toast.success(`Tema ${t.label} activado`) }}
+                className="p-3 rounded-2xl text-center transition-all"
+                style={{ border:`2px solid ${appTheme===t.id?t.colors[0]:'var(--border)'}`, background:appTheme===t.id?`${t.colors[0]}12`:'var(--bg)' }}>
+                <div className="flex justify-center gap-1 mb-2">
+                  <div className="w-5 h-5 rounded-full" style={{ background:t.colors[0] }} />
+                  <div className="w-5 h-5 rounded-full" style={{ background:t.colors[1] }} />
+                </div>
+                <p className="text-xs font-bold" style={{ color:appTheme===t.id?t.colors[0]:'var(--text-2)' }}>{t.label}</p>
+              </button>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard>
+          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)' }}>Color de acento</p>
+          <div className="flex gap-2 flex-wrap">
+            {ACCENT_COLORS.map(c=>(
+              <button key={c} onClick={() => { setAccentColor(c); toast.success('Color actualizado') }}
+                style={{ width:32,height:32,borderRadius:'50%',background:c,border:`3px solid ${accentColor===c?'var(--text-1)':'transparent'}`,boxShadow:accentColor===c?`0 0 0 2px var(--surface)`:undefined }} />
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard>
+          <div className="settings-row">
+            <span className="font-semibold text-sm">Tamaño de fuente</span>
+            <div className="flex gap-1.5">
+              {['S','M','L','XL'].map((s,i)=>{
+                const vals=['small','normal','large','xlarge']
+                return <button key={s} onClick={()=>setFontSize(vals[i])}
+                  className="w-8 h-8 rounded-xl font-bold text-sm transition-all"
+                  style={{ background:fontSize===vals[i]?'var(--blue)':'var(--bg)', color:fontSize===vals[i]?'#fff':'var(--text-2)', border:`1px solid ${fontSize===vals[i]?'var(--blue)':'var(--border)'}` }}>{s}</button>
+              })}
             </div>
-            <button onClick={()=>{ if(confirm('⚠️ This will delete ALL data. Are you sure?')){ localStorage.clear(); window.location.reload() }}}
-              style={{ padding:'8px 16px', borderRadius:10, border:'1.5px solid #EF4444', background:'#FEF2F2', color:'#EF4444', fontSize:13, fontWeight:600, fontFamily:'Inter', cursor:'pointer' }}>
-              Reset
+          </div>
+          <div className="settings-row">
+            <span className="font-semibold text-sm">Densidad calendario</span>
+            <div className="flex gap-1.5">
+              {[{v:'compact',l:'Compact'},{v:'normal',l:'Normal'},{v:'spacious',l:'Espacioso'}].map(opt=>(
+                <button key={opt.v} onClick={()=>setCalDensity(opt.v)}
+                  className="pill"
+                  style={{ background:calDensity===opt.v?'var(--blue)':'var(--bg)', color:calDensity===opt.v?'#fff':'var(--text-2)', border:`1.5px solid ${calDensity===opt.v?'var(--blue)':'var(--border)'}` }}>
+                  {opt.l}
+                </button>
+              ))}
+            </div>
+          </div>
+        </SectionCard>
+      </div>
+    ),
+
+    // ── NOTIFICATIONS ──
+    notifications: (
+      <div>
+        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>🔔 Notificaciones</h1>
+
+        <SectionCard>
+          <div className="settings-row">
+            <div>
+              <p className="font-bold text-sm">Notificaciones</p>
+              <p className="text-xs" style={{ color:'var(--text-3)' }}>Activar/desactivar todas</p>
+            </div>
+            <Toggle value={notifMaster} onChange={v => { setNotifMaster(v); onUpdate({ notifications:v }) }} />
+          </div>
+        </SectionCard>
+
+        <SectionCard>
+          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)' }}>Por tipo</p>
+          {[
+            { k:'taskReminder', l:'Recordatorio de task', sub:'Antes de que venza un task' },
+            { k:'taskDone',     l:'Task completado',      sub:'Cuando un hijo termina un task' },
+            { k:'newEvent',     l:'Nuevo evento',         sub:'Eventos añadidos al calendario' },
+            { k:'chat',         l:'Chat familiar',        sub:'Mensajes del chat' },
+            { k:'achievement',  l:'Logro desbloqueado',   sub:'Cuando alguien consigue un logro' },
+            { k:'reward',       l:'Premio reclamado',     sub:'Solicitudes de recompensa' },
+          ].map(item=>(
+            <div key={item.k} className="settings-row" style={{ opacity:notifMaster?1:0.4 }}>
+              <div>
+                <p className="font-semibold text-sm">{item.l}</p>
+                <p className="text-xs" style={{ color:'var(--text-3)' }}>{item.sub}</p>
+              </div>
+              <Toggle value={(notifTypes as any)[item.k]} onChange={v=>setNotifTypes(t=>({...t,[item.k]:v}))} disabled={!notifMaster} />
+            </div>
+          ))}
+        </SectionCard>
+
+        <SectionCard>
+          <div className="settings-row">
+            <div>
+              <p className="font-bold text-sm">Horas de silencio</p>
+              <p className="text-xs" style={{ color:'var(--text-3)' }}>Sin notificaciones en este rango</p>
+            </div>
+            <Toggle value={silentHours} onChange={setSilentHours} />
+          </div>
+          {silentHours && (
+            <div className="flex items-center gap-3 mt-3">
+              <div className="flex-1">
+                <label className="text-xs font-semibold mb-1 block" style={{ color:'var(--text-3)' }}>Desde</label>
+                <input type="time" value={silentFrom} onChange={e=>setSilentFrom(e.target.value)} className="input-apple" />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs font-semibold mb-1 block" style={{ color:'var(--text-3)' }}>Hasta</label>
+                <input type="time" value={silentTo} onChange={e=>setSilentTo(e.target.value)} className="input-apple" />
+              </div>
+            </div>
+          )}
+        </SectionCard>
+      </div>
+    ),
+
+    // ── GAMIFICATION ──
+    gamification: (
+      <div>
+        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>🏆 Gamificación</h1>
+
+        <SectionCard>
+          <div className="settings-row">
+            <div>
+              <p className="font-bold text-sm">Sistema de puntos</p>
+              <p className="text-xs" style={{ color:'var(--text-3)' }}>Los hijos ganan puntos al completar tasks</p>
+            </div>
+            <Toggle value={true} onChange={() => toast('Próximamente')} />
+          </div>
+          <div className="settings-row">
+            <div>
+              <p className="font-bold text-sm">Rachas</p>
+              <p className="text-xs" style={{ color:'var(--text-3)' }}>Días consecutivos completando tasks</p>
+            </div>
+            <Toggle value={true} onChange={() => toast('Próximamente')} />
+          </div>
+          <div className="settings-row">
+            <span className="font-semibold text-sm">Puntos por defecto</span>
+            <input type="number" defaultValue={10} min={1} max={100}
+              className="input-apple" style={{ width:80, textAlign:'center', padding:'8px' }} />
+          </div>
+        </SectionCard>
+
+        <SectionCard>
+          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)' }}>🏅 Logros disponibles</p>
+          {[
+            { e:'🌟', t:'Primera Tarea', d:'Completar el primer task', pts:50 },
+            { e:'🔥', t:'Racha de 7 días', d:'7 días consecutivos', pts:100 },
+            { e:'💯', t:'Perfeccionista', d:'100 tasks completados', pts:500 },
+            { e:'👑', t:'Campeón', d:'1000 puntos acumulados', pts:1000 },
+          ].map((a,i)=>(
+            <div key={i} className="flex items-center gap-3 py-2.5 border-b last:border-0" style={{ borderColor:'var(--border)' }}>
+              <span className="text-2xl">{a.e}</span>
+              <div className="flex-1">
+                <p className="font-bold text-sm">{a.t}</p>
+                <p className="text-xs" style={{ color:'var(--text-3)' }}>{a.d}</p>
+              </div>
+              <span className="text-xs font-bold" style={{ color:'var(--orange)' }}>⭐{a.pts}</span>
+            </div>
+          ))}
+        </SectionCard>
+      </div>
+    ),
+
+    // ── CALENDAR ──
+    calendar: (
+      <div>
+        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>📅 Calendario</h1>
+
+        <SectionCard>
+          <div className="settings-row">
+            <span className="font-semibold text-sm">Vista por defecto</span>
+            <select className="input-apple" style={{ width:'auto', padding:'8px 12px' }}>
+              <option>Semana</option><option>Día</option><option>Mes</option><option>Agenda</option>
+            </select>
+          </div>
+          <div className="settings-row">
+            <div>
+              <p className="font-bold text-sm">Mostrar tasks en calendario</p>
+              <p className="text-xs" style={{ color:'var(--text-3)' }}>Tasks con hora aparecen en su slot</p>
+            </div>
+            <Toggle value={true} onChange={() => {}} />
+          </div>
+          <div className="settings-row">
+            <span className="font-semibold text-sm">La semana empieza en</span>
+            <div className="flex gap-2">
+              {['Domingo','Lunes'].map(d=>(
+                <button key={d} className="pill pill-default">{d}</button>
+              ))}
+            </div>
+          </div>
+          <div className="settings-row">
+            <span className="font-semibold text-sm">Mostrar fines de semana</span>
+            <Toggle value={true} onChange={() => {}} />
+          </div>
+        </SectionCard>
+
+        <SectionCard>
+          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)' }}>Integraciones</p>
+          {[
+            { icon:'🗓️', name:'Google Calendar', sub:'Sincronizar eventos' },
+            { icon:'🍎', name:'Apple Calendar',  sub:'Importar/exportar' },
+          ].map(item=>(
+            <div key={item.name} className="settings-row">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">{item.icon}</span>
+                <div><p className="font-semibold text-sm">{item.name}</p><p className="text-xs" style={{ color:'var(--text-3)' }}>{item.sub}</p></div>
+              </div>
+              <button className="btn btn-secondary" style={{ padding:'7px 16px', fontSize:13 }}
+                onClick={() => toast('Próximamente')}>
+                Conectar
+              </button>
+            </div>
+          ))}
+          <button className="btn btn-ghost w-full mt-3" style={{ justifyContent:'center' }}
+            onClick={() => toast('Exportando .ics...')}>
+            <Download size={15} /> Exportar calendario (.ics)
+          </button>
+        </SectionCard>
+      </div>
+    ),
+
+    // ── SECURITY ──
+    security: (
+      <div>
+        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>🔒 Seguridad</h1>
+
+        <SectionCard>
+          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)' }}>Cambiar contraseña</p>
+          <div className="flex flex-col gap-3">
+            <div className="relative">
+              <input type={showPw?'text':'password'} value={pwForm.current} onChange={e=>setPwForm(f=>({...f,current:e.target.value}))}
+                placeholder="Contraseña actual" className="input-apple" style={{ paddingRight:44 }} />
+              <button onClick={()=>setShowPw(v=>!v)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color:'var(--text-3)', background:'none', border:'none', cursor:'pointer' }}>
+                {showPw?<EyeOff size={16}/>:<Eye size={16}/>}
+              </button>
+            </div>
+            <input type="password" value={pwForm.next} onChange={e=>setPwForm(f=>({...f,next:e.target.value}))}
+              placeholder="Nueva contraseña" className="input-apple" />
+            <input type="password" value={pwForm.confirm} onChange={e=>setPwForm(f=>({...f,confirm:e.target.value}))}
+              placeholder="Confirmar nueva contraseña" className="input-apple" />
+            <button className="btn btn-primary" style={{ padding:'12px' }}
+              onClick={() => { if(pwForm.next===pwForm.confirm&&pwForm.next.length>=6){toast.success('Contraseña actualizada ✅');setPwForm({current:'',next:'',confirm:''})}else{toast.error('Las contraseñas no coinciden o son muy cortas')} }}>
+              Actualizar contraseña
             </button>
           </div>
-        </Section>
+        </SectionCard>
 
-        {/* Save button at bottom too */}
-        {isDirty && (
-          <motion.button initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} onClick={handleSave} whileTap={{ scale:0.97 }}
-            style={{ width:'100%', padding:'14px', borderRadius:16, background:'var(--blue)', color:'#fff', border:'none', fontSize:16, fontWeight:700, fontFamily:'Inter', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, marginBottom:24, boxShadow:'0 4px 20px rgba(79,70,229,0.3)' }}>
-            <Save size={18}/> Save Changes
-          </motion.button>
-        )}
+        <SectionCard>
+          <div className="settings-row">
+            <div>
+              <p className="font-bold text-sm">Autenticación 2 factores</p>
+              <p className="text-xs" style={{ color:'var(--text-3)' }}>Seguridad extra con autenticador</p>
+            </div>
+            <Toggle value={twoFAEnabled} onChange={v=>{setTwoFAEnabled(v);toast(v?'2FA activado 🔐':'2FA desactivado')}} />
+          </div>
+          <div className="settings-row">
+            <div>
+              <p className="font-bold text-sm">PIN parental</p>
+              <p className="text-xs" style={{ color:'var(--text-3)' }}>Los niños no pueden cambiar ajustes</p>
+            </div>
+            <button className="btn btn-secondary" style={{ padding:'7px 16px', fontSize:13 }}
+              onClick={() => toast('Próximamente')}>
+              Configurar
+            </button>
+          </div>
+        </SectionCard>
 
-        <div style={{ textAlign:'center', padding:'0 0 24px', color:'var(--text-3)', fontSize:12, fontFamily:'Inter' }}>
-          FamilyQuest v1.0 · Built with ❤️
+        <SectionCard>
+          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)' }}>Sesiones activas</p>
+          {[
+            { device:'Chrome · Windows', time:'Ahora mismo', current:true },
+            { device:'Safari · iPhone', time:'Hace 2 horas', current:false },
+          ].map((s,i)=>(
+            <div key={i} className="flex items-center justify-between py-2.5 border-b last:border-0" style={{ borderColor:'var(--border)' }}>
+              <div>
+                <p className="font-semibold text-sm">{s.device}</p>
+                <p className="text-xs" style={{ color:s.current?'var(--green)':'var(--text-3)' }}>{s.time}</p>
+              </div>
+              {!s.current && <button className="text-xs font-bold" style={{ color:'var(--red)' }} onClick={()=>toast('Sesión cerrada')}>Cerrar</button>}
+            </div>
+          ))}
+          <button className="btn btn-ghost w-full mt-3" style={{ color:'var(--red)', justifyContent:'center' }}
+            onClick={() => toast.error('Todas las sesiones cerradas')}>
+            <LogOut size={15} /> Cerrar todas las sesiones
+          </button>
+        </SectionCard>
+
+        <SectionCard>
+          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)', color:'var(--red)' }}>⚠️ Zona peligrosa</p>
+          <button className="btn btn-ghost w-full mb-3" style={{ justifyContent:'center' }}
+            onClick={() => { const d=JSON.stringify({}); const b=new Blob([d],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='familyquest-backup.json'; a.click() }}>
+            <Download size={15} /> Descargar mis datos
+          </button>
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-semibold" style={{ color:'var(--text-3)' }}>Escribe ELIMINAR para confirmar</p>
+            <input value={deleteConfirm} onChange={e=>setDeleteConfirm(e.target.value)}
+              placeholder='Escribe "ELIMINAR"' className="input-apple" style={{ borderColor: deleteConfirm==='ELIMINAR'?'var(--red)':'var(--border)' }} />
+            <button disabled={deleteConfirm!=='ELIMINAR'}
+              onClick={() => { if(deleteConfirm==='ELIMINAR'){localStorage.clear();window.location.reload()} }}
+              className="btn btn-danger w-full" style={{ padding:'12px', opacity:deleteConfirm==='ELIMINAR'?1:0.4 }}>
+              Eliminar cuenta permanentemente
+            </button>
+          </div>
+        </SectionCard>
+      </div>
+    ),
+
+    // ── SUBSCRIPTION ──
+    subscription: (
+      <div>
+        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>💳 Plan</h1>
+        <SectionCard>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl" style={{ background:'rgba(245,158,11,0.1)' }}>⭐</div>
+            <div>
+              <p className="font-black text-lg" style={{ fontFamily:'var(--font-heading)' }}>Plan Free</p>
+              <p className="text-sm" style={{ color:'var(--text-3)' }}>5 miembros · 30 tasks/mes</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { name:'Free', price:'$0', features:['5 miembros','30 tasks/mes','1 semana historial'], color:'#64748B' },
+              { name:'Pro', price:'$4.99', features:['Ilimitado','Tasks sin límite','Historial completo','Sin anuncios'], color:'var(--blue)', highlight:true },
+              { name:'Family Pro', price:'$9.99', features:['Todo Pro','8 miembros','Múltiples familias','Soporte prioritario'], color:'#AF52DE' },
+            ].map(plan=>(
+              <div key={plan.name} className="card p-4 text-center"
+                style={{ border:`2px solid ${plan.highlight?plan.color:'var(--border)'}`, background:plan.highlight?`rgba(0,122,255,0.04)`:undefined }}>
+                <p className="font-black text-base mb-1" style={{ color:plan.color, fontFamily:'var(--font-heading)' }}>{plan.name}</p>
+                <p className="font-black text-2xl mb-3" style={{ fontFamily:'var(--font-heading)' }}>{plan.price}<span className="text-xs font-normal text-gray-400">/mes</span></p>
+                <ul className="text-xs text-left space-y-1 mb-4" style={{ color:'var(--text-2)' }}>
+                  {plan.features.map(f=><li key={f} className="flex items-center gap-1"><Check size={11} style={{ color:plan.color }}/>{f}</li>)}
+                </ul>
+                <button onClick={() => toast('Próximamente: Stripe Checkout')}
+                  className="btn w-full" style={{ background:plan.highlight?plan.color:'var(--bg)', color:plan.highlight?'#fff':'var(--text-2)', border:`1px solid ${plan.color}`, padding:'8px', fontSize:12, borderRadius:'var(--radius-md)' }}>
+                  {plan.highlight?'Upgrade':'Seleccionar'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      </div>
+    ),
+
+    // ── ABOUT ──
+    about: (
+      <div>
+        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>ℹ️ Acerca de</h1>
+        <SectionCard>
+          <div className="flex items-center gap-4 mb-4">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center font-black text-2xl text-white"
+              style={{ background:'linear-gradient(135deg,#007AFF,#5856D6)', fontFamily:'var(--font-heading)' }}>FQ</div>
+            <div>
+              <p className="font-black text-lg" style={{ fontFamily:'var(--font-heading)' }}>FamilyQuest</p>
+              <p className="text-sm" style={{ color:'var(--text-3)' }}>Versión 1.0.0</p>
+            </div>
+          </div>
+          {[
+            { l:'Novedades', sub:'Ver qué hay de nuevo', icon:Smartphone },
+            { l:'Términos de uso', sub:'Leer los términos', icon:Link2 },
+            { l:'Política de privacidad', sub:'Cómo usamos tus datos', icon:Shield },
+            { l:'Contacto / Soporte', sub:'Escríbenos un email', icon:Hash },
+          ].map(item=>(
+            <div key={item.l} className="settings-row cursor-pointer" onClick={() => toast('Próximamente')}>
+              <div className="flex items-center gap-2">
+                <item.icon size={16} style={{ color:'var(--text-3)' }} />
+                <div><p className="font-semibold text-sm">{item.l}</p><p className="text-xs" style={{ color:'var(--text-3)' }}>{item.sub}</p></div>
+              </div>
+              <ChevronRight size={16} style={{ color:'var(--text-3)' }} />
+            </div>
+          ))}
+        </SectionCard>
+        <div className="text-center mt-4" style={{ color:'var(--text-3)' }}>
+          <p className="text-xs">Hecho con ❤️ para las familias</p>
+          <p className="text-xs mt-1">© 2026 FamilyQuest</p>
         </div>
+      </div>
+    ),
+  }
+
+  return (
+    <div style={{ display:'flex', height:'100%', background:'var(--bg)', overflow:'hidden' }}>
+      {/* Left nav */}
+      <div style={{ width:220, background:'var(--surface)', borderRight:'1px solid var(--border)', padding:'20px 12px', display:'flex', flexDirection:'column', gap:2, flexShrink:0, overflowY:'auto' }}>
+        <p className="text-xs font-bold uppercase tracking-wider px-2 mb-3" style={{ color:'var(--text-3)' }}>Ajustes</p>
+        {NAV.map(item => (
+          <button key={item.id} onClick={() => setActive(item.id)}
+            className={`settings-nav-item ${active===item.id?'active':''}`}>
+            <span className="text-base">{item.emoji}</span>
+            {item.label}
+            {active===item.id && <ChevronRight size={14} className="ml-auto" style={{ color:'var(--blue)' }} />}
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div style={{ flex:1, overflowY:'auto', padding:'24px' }}>
+        <AnimatePresence mode="wait">
+          <motion.div key={active}
+            initial={{ opacity:0, x:12 }}
+            animate={{ opacity:1, x:0 }}
+            exit={{ opacity:0, x:-12 }}
+            transition={{ duration:0.18, ease:'easeInOut' }}>
+            {sections[active]}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   )

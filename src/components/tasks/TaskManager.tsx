@@ -110,7 +110,7 @@ export function TaskManager() {
         </div>
       )}
 
-      <AddTaskModal open={showModal} onClose={() => setShowModal(false)} />
+      <AddTaskModal open={showModal} onClose={() => setShowModal(false)} onAdd={() => {}} />
     </div>
   )
 }
