@@ -64,62 +64,74 @@ export default function App() {
         }}
       />
 
-      {/* Sidebar — Miller Family style: white, clean, icon + label */}
+      {/* ── SIDEBAR — exactly like Stitch Miller Family ── */}
       <aside style={{
-        width: 72,
+        width: 80,
         background: '#FFFFFF',
-        borderRight: '1px solid var(--border-soft)',
+        borderRight: '1px solid #EEE8E0',
         height: '100vh',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        padding: '16px 0',
+        padding: '24px 0 16px',
         flexShrink: 0, zIndex: 10,
-        boxShadow: '1px 0 0 var(--border-soft)',
       }}>
-        {/* Weather widget — compact */}
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', marginBottom:8, paddingBottom:10, borderBottom:'1px solid var(--border-soft)', width:'85%' }}>
-          <span style={{ fontSize:22, lineHeight:1 }}>{weather?.emoji ?? '🌤️'}</span>
-          <p style={{ fontWeight:700, fontSize:18, color:'var(--text-1)', fontFamily:'var(--font-serif)', lineHeight:1.1, marginTop:3 }}>
-            {weather
-              ? (settings.temperatureUnit === 'F' ? `${weather.tempF}°` : `${weather.temp}°`)
-              : '—'
-            }
+        {/* Serif monogram — like "S" in Stitch HTML */}
+        <div style={{
+          fontFamily: 'var(--font-serif)',
+          fontSize: 28, fontWeight: 700,
+          color: '#B8A89A',
+          marginBottom: 20,
+          letterSpacing: '-0.02em',
+        }}>
+          {(settings.familyName || 'F')[0]}
+        </div>
+
+        {/* Weather — compact */}
+        <div style={{
+          display:'flex', flexDirection:'column', alignItems:'center',
+          marginBottom: 16, paddingBottom: 14,
+          borderBottom: '1px solid #EEE8E0', width: '75%',
+        }}>
+          <span style={{ fontSize:20 }}>{weather?.emoji ?? '☀️'}</span>
+          <p style={{ fontWeight:700, fontSize:17, color:'#2D3748', fontFamily:'var(--font-serif)', lineHeight:1, marginTop:2 }}>
+            {weather ? (settings.temperatureUnit==='F' ? `${weather.tempF}°` : `${weather.temp}°`) : '—'}
           </p>
-          <p style={{ fontWeight:600, fontSize:7, color:'var(--text-3)', letterSpacing:'0.08em', textTransform:'uppercase', textAlign:'center', lineHeight:1.4, marginTop:2 }}>
-            {weather?.description ?? 'WEATHER'}
+          <p style={{ fontSize:7, fontWeight:600, color:'#A0AEC0', letterSpacing:'0.1em', textTransform:'uppercase', textAlign:'center', lineHeight:1.3, marginTop:2 }}>
+            {weather?.description?.split(' ').slice(0,2).join('\n') ?? 'PARTLY\nCLOUDY'}
           </p>
         </div>
 
-        {/* Nav */}
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2, flex:1, width:'100%', padding:'0 8px' }}>
+        {/* Nav — icon + label, exactly like Stitch */}
+        <nav style={{ display:'flex', flexDirection:'column', gap:6, width:'100%', padding:'0 10px', flex:1 }}>
           {NAV.map(({ id, icon: Icon, label }) => {
             const active = activeView === id
             return (
-              <div key={id} style={{ position:'relative', width:'100%' }}
+              <div key={id} style={{ position:'relative' }}
                 onMouseEnter={() => setHovered(id)}
-                onMouseLeave={() => setHovered(null)}
-              >
+                onMouseLeave={() => setHovered(null)}>
                 <motion.button
                   onClick={() => setActiveView(id)}
                   whileTap={{ scale: 0.93 }}
                   style={{
-                    width: '100%', height: 52,
-                    borderRadius: 12,
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    width: '100%', padding: '8px 4px 6px',
+                    borderRadius: 10,
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center',
                     gap: 3, border: 'none',
-                    background: active ? 'var(--pink)' : hovered === id ? 'rgba(0,0,0,0.04)' : 'transparent',
-                    cursor: 'pointer', transition: 'background 150ms ease',
+                    background: active ? '#FBE9EC' : hovered === id ? '#F7F4F0' : 'transparent',
+                    cursor: 'pointer', transition: 'background 150ms',
+                    opacity: active ? 1 : 0.55,
                   }}
                 >
                   <Icon
-                    size={20}
-                    strokeWidth={active ? 2.2 : 1.6}
-                    color={active ? 'var(--pink-text)' : 'var(--text-3)'}
+                    size={22}
+                    strokeWidth={active ? 2.0 : 1.5}
+                    color={active ? '#C25B6E' : '#4A5568'}
                   />
                   <span style={{
-                    fontSize: 9, fontWeight: active ? 700 : 500,
-                    color: active ? 'var(--pink-text)' : 'var(--text-3)',
+                    fontSize: 9, fontWeight: 600,
+                    color: active ? '#C25B6E' : '#718096',
                     fontFamily: 'var(--font-body)',
-                    textTransform: 'uppercase', letterSpacing: '0.05em',
+                    textTransform: 'uppercase', letterSpacing: '0.07em',
                     lineHeight: 1,
                   }}>
                     {label}
@@ -129,39 +141,34 @@ export default function App() {
                 <AnimatePresence>
                   {hovered === id && !active && (
                     <motion.div
-                      initial={{ opacity:0, x:-6 }}
-                      animate={{ opacity:1, x:0 }}
-                      exit={{ opacity:0, x:-6 }}
+                      initial={{ opacity:0, x:-6 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0 }}
                       transition={{ duration: 0.1 }}
                       style={{
                         position: 'absolute', left: '110%', top: '50%', transform: 'translateY(-50%)',
-                        background: 'var(--text-1)', color: '#fff',
+                        background: '#2D3748', color: '#fff',
                         fontSize: 12, fontWeight: 600,
-                        padding: '6px 12px',
-                        borderRadius: 'var(--radius-md)',
+                        padding: '5px 10px', borderRadius: 8,
                         whiteSpace: 'nowrap', pointerEvents: 'none', zIndex: 99,
-                        boxShadow: 'var(--shadow-md)',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                         fontFamily: 'var(--font-body)',
                       }}
-                    >
-                      {label}
-                    </motion.div>
+                    >{label}</motion.div>
                   )}
                 </AnimatePresence>
               </div>
             )
           })}
-        </div>
+        </nav>
 
         {/* User avatar at bottom */}
         {members.filter(m => m.role === 'adult').slice(0, 1).map(m => (
-          <div key={m.id} style={{ marginTop:'auto', marginBottom:8, padding:'0 8px', width:'100%', display:'flex', justifyContent:'center' }}>
+          <div key={m.id} style={{ padding: '0 10px', width:'100%', display:'flex', justifyContent:'center' }}>
             <motion.button
               onClick={() => setActiveView('settings')}
               whileHover={{ scale:1.05 }} whileTap={{ scale:0.95 }}
               style={{ border:'none', background:'transparent', cursor:'pointer', borderRadius:'50%' }}
             >
-              <MemberAvatar member={m} size={38} />
+              <MemberAvatar member={m} size={40} />
             </motion.button>
           </div>
         ))}
