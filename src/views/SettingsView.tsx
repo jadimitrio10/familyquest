@@ -1,46 +1,72 @@
 import { useState, useRef, useCallback } from 'react'
-import { useCalendarPrefs } from '@/hooks/useCalendarPrefs'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   User, Users, Palette, Bell, Trophy, CalendarDays,
   Shield, CreditCard, Info, ChevronRight, Camera,
   Copy, Check, Trash2, Plus, Edit2, X, Save,
-  Download, LogOut, Smartphone, Eye, EyeOff,
-  Globe, Clock, Hash, Link2, Share2
+  Download, LogOut, Eye, EyeOff, Share2,
 } from 'lucide-react'
 import { useMembersStore, type Member } from '@/hooks/useMembersStore'
 import { MemberAvatar } from '@/components/shared/MemberAvatar'
 import { Toggle } from '@/components/shared/Toggle'
 import { EmojiPicker } from '@/components/shared/EmojiPicker'
+import { useCalendarPrefs } from '@/hooks/useCalendarPrefs'
 import type { AppSettings } from '@/types/app.types'
 import toast from 'react-hot-toast'
 
-type SectionId =
-  'profile' | 'family' | 'appearance' | 'notifications' |
-  'gamification' | 'calendar' | 'security' | 'subscription' | 'about'
+// ─── Module-level helpers (stable references — fixes input focus bug) ──────
+function SettingsGroup({ label, children }: { label?: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 28 }}>
+      {label && (
+        <p style={{ fontSize: 12, fontWeight: 600, color: '#8E8E93', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8, paddingLeft: 4, fontFamily: 'var(--font-body)' }}>
+          {label}
+        </p>
+      )}
+      <div style={{ background: '#fff', borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+        {children}
+      </div>
+    </div>
+  )
+}
 
-const NAV: { id: SectionId; icon: React.ElementType; label: string; emoji: string }[] = [
-  { id:'profile',       icon:User,         label:'Perfil',               emoji:'👤' },
-  { id:'family',        icon:Users,        label:'Familia',              emoji:'👨‍👩‍👧' },
-  { id:'appearance',    icon:Palette,      label:'Apariencia',           emoji:'🎨' },
-  { id:'notifications', icon:Bell,         label:'Notificaciones',       emoji:'🔔' },
-  { id:'gamification',  icon:Trophy,       label:'Gamificación',         emoji:'🏆' },
-  { id:'calendar',      icon:CalendarDays, label:'Calendario',           emoji:'📅' },
-  { id:'security',      icon:Shield,       label:'Seguridad',            emoji:'🔒' },
-  { id:'subscription',  icon:CreditCard,   label:'Plan',                 emoji:'💳' },
-  { id:'about',         icon:Info,         label:'Acerca de',            emoji:'ℹ️' },
-]
+function SettingsRow({
+  icon, iconBg, label, sub, children, onClick, showArrow, value, last
+}: {
+  icon?: React.ReactNode; iconBg?: string; label: string; sub?: string
+  children?: React.ReactNode; onClick?: () => void; showArrow?: boolean
+  value?: string; last?: boolean
+}) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 13,
+        padding: '12px 16px',
+        borderBottom: last ? 'none' : '1px solid rgba(0,0,0,0.06)',
+        cursor: onClick ? 'pointer' : 'default',
+        background: 'transparent',
+        transition: 'background 0.12s',
+      }}
+      onMouseEnter={e => onClick && (e.currentTarget.style.background = 'rgba(0,0,0,0.02)')}
+      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+    >
+      {icon && (
+        <div style={{ width: 32, height: 32, borderRadius: 8, background: iconBg || '#007AFF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          {icon}
+        </div>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 15, fontWeight: 500, color: '#1C1C1E', fontFamily: 'var(--font-body)', lineHeight: 1.2 }}>{label}</p>
+        {sub && <p style={{ fontSize: 12, color: '#8E8E93', marginTop: 2, fontFamily: 'var(--font-body)' }}>{sub}</p>}
+      </div>
+      {value && <p style={{ fontSize: 14, color: '#8E8E93', fontFamily: 'var(--font-body)', flexShrink: 0 }}>{value}</p>}
+      {children}
+      {showArrow && <ChevronRight size={16} color="#C7C7CC" style={{ flexShrink: 0 }} />}
+    </div>
+  )
+}
 
-const THEMES = [
-  { id:'default', label:'Default', colors:['#007AFF','#5856D6'] },
-  { id:'ocean',   label:'Ocean',   colors:['#00C7BE','#30B0C7'] },
-  { id:'forest',  label:'Forest',  colors:['#34C759','#30D158'] },
-  { id:'sunset',  label:'Sunset',  colors:['#FF9500','#FF6B00'] },
-  { id:'candy',   label:'Candy',   colors:['#FF2D55','#FF375F'] },
-  { id:'midnight',label:'Midnight',colors:['#5856D6','#AF52DE'] },
-]
-const ACCENT_COLORS = ['#007AFF','#34C759','#FF3B30','#FF9500','#AF52DE','#5856D6','#FF2D55','#00C7BE','#FFCC00','#30B0C7','#FF6B00','#30D158']
-const TIMEZONES = ['America/New_York','America/Chicago','America/Denver','America/Los_Angeles','America/Bogota','America/Lima','America/Santiago','Europe/Madrid','Europe/London','Europe/Paris']
 const COLOR_OPTIONS = [
   { bg:'#FFE4E6',text:'#9F1239',bar:'#FB7185' },
   { bg:'#E0F2FE',text:'#075985',bar:'#38BDF8' },
@@ -52,809 +78,634 @@ const COLOR_OPTIONS = [
   { bg:'#CCFBF1',text:'#134E4A',bar:'#2DD4BF' },
 ]
 
-// ── Module-level helpers — STABLE references (no re-create on re-render) ──
-// Moving these OUTSIDE the component prevents React from unmounting
-// inputs on every keystroke (which caused the "one letter then lose focus" bug)
+type SectionId = 'profile'|'family'|'appearance'|'notifications'|'gamification'|'calendar'|'security'|'subscription'|'about'
 
-function SectionCard({ children }: { children: React.ReactNode }) {
-  return <div className="card p-5 mb-4">{children}</div>
-}
+const SECTIONS: { id: SectionId; emoji: string; label: string; iconBg: string }[] = [
+  { id:'profile',       emoji:'👤', label:'Perfil',          iconBg:'#007AFF' },
+  { id:'family',        emoji:'👨‍👩‍👧', label:'Familia',         iconBg:'#FF9500' },
+  { id:'appearance',    emoji:'🎨', label:'Apariencia',      iconBg:'#AF52DE' },
+  { id:'notifications', emoji:'🔔', label:'Notificaciones',  iconBg:'#FF3B30' },
+  { id:'gamification',  emoji:'🏆', label:'Gamificación',    iconBg:'#FFCC00' },
+  { id:'calendar',      emoji:'📅', label:'Calendario',      iconBg:'#34C759' },
+  { id:'security',      emoji:'🔒', label:'Seguridad',       iconBg:'#636366' },
+  { id:'subscription',  emoji:'💳', label:'Plan',            iconBg:'#5AC8FA' },
+  { id:'about',         emoji:'ℹ️', label:'Acerca de',       iconBg:'#8E8E93' },
+]
 
-function Row({ label, sub, children }: { label: string; sub?: string; children?: React.ReactNode }) {
-  return (
-    <div className="settings-row">
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>{label}</p>
-        {sub && <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>{sub}</p>}
-      </div>
-      {children}
-    </div>
-  )
-}
-
+// ─── Props ────────────────────────────────────────────────────────────────
 interface SettingsViewProps {
   settings: AppSettings
   onUpdate: (patch: Partial<AppSettings>) => void
 }
 
+// ══════════════════════════════════════════════════════════════════════════
 export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
-  const [active, setActive] = useState<SectionId>('profile')
+  const [active, setActive]   = useState<SectionId>('profile')
   const { members, addMember, updateMember, removeMember, uploadPhoto } = useMembersStore()
   const { prefs: calPrefs, update: updateCalPrefs } = useCalendarPrefs()
 
-  // Auto-save calendar prefs with feedback
-  const saveCalPref = useCallback((patch: Parameters<typeof updateCalPrefs>[0]) => {
-    updateCalPrefs(patch)
-    toast.success('Guardado ✅', { duration:1500,
-      style:{ borderRadius:12, fontFamily:'var(--font-body)', fontWeight:600, fontSize:13 } })
-  }, [updateCalPrefs])
+  // Profile form — local state
+  const [profileName, setProfileName] = useState(settings.familyName || '')
+  const [profilePhone, setProfilePhone] = useState('')
 
-  // Profile
-  const [profileForm, setProfileForm] = useState({ name: settings.familyName || '', phone:'', timezone:'America/New_York', language:'es', dateFormat:'MM/DD/YYYY', timeFormat:'12h' })
+  // Family member editing
+  const [editingId, setEditingId]         = useState<string|null>(null)
+  const [editName, setEditName]           = useState('')
+  const [showAddMember, setShowAddMember] = useState(false)
+  const [showEmojiFor, setShowEmojiFor]   = useState<string|null>(null)
+  const [newMember, setNewMember]         = useState({ name:'', emoji:'👤', colorIdx:0, role:'child' as 'adult'|'child' })
+  const [copied, setCopied]               = useState(false)
   const fileRefs = useRef<Record<string, HTMLInputElement>>({})
-
-  // Appearance
-  const [appTheme, setAppTheme] = useState('default')
-  const [accentColor, setAccentColor] = useState('#007AFF')
-  const [fontSize, setFontSize] = useState('normal')
-  const [calDensity, setCalDensity] = useState('normal')
 
   // Notifications
   const [notifMaster, setNotifMaster] = useState(settings.notifications)
-  const [notifTypes, setNotifTypes] = useState({
-    taskReminder:true, taskDone:true, newEvent:true,
-    chat:false, achievement:true, reward:true,
-  })
+  const [notifTypes, setNotifTypes]   = useState({ taskReminder:true, taskDone:true, newEvent:true, achievement:true, reward:true })
   const [silentHours, setSilentHours] = useState(false)
-  const [silentFrom, setSilentFrom] = useState('22:00')
-  const [silentTo, setSilentTo] = useState('07:00')
-
-  // Family
-  const [showAddMember, setShowAddMember] = useState(false)
-  const [editingId, setEditingId] = useState<string|null>(null)
-  const [editName, setEditName] = useState('')
-  const [newMemberForm, setNewMemberForm] = useState({ name:'', emoji:'👤', colorIdx:0, role:'child' as 'adult'|'child' })
-  const [copied, setCopied] = useState(false)
-  const [showEmojiFor, setShowEmojiFor] = useState<string|null>(null)
+  const [silentFrom, setSilentFrom]   = useState('22:00')
+  const [silentTo, setSilentTo]       = useState('07:00')
 
   // Security
-  const [pwForm, setPwForm] = useState({ current:'', next:'', confirm:'' })
-  const [showPw, setShowPw] = useState(false)
-  const [pinForm, setPinForm] = useState({ pin:'', confirm:'' })
-  const [deleteConfirm, setDeleteConfirm] = useState('')
-  const [twoFAEnabled, setTwoFAEnabled] = useState(false)
+  const [pwForm, setPwForm]     = useState({ current:'', next:'', confirm:'' })
+  const [showPw, setShowPw]     = useState(false)
+  const [twoFA, setTwoFA]       = useState(false)
+  const [deleteWord, setDeleteWord] = useState('')
 
-  function handlePhotoUpload(memberId: string, file: File) {
+  const saved = useCallback(() =>
+    toast.success('Guardado', { duration:1500, icon:'✅',
+      style:{ borderRadius:12, fontFamily:'var(--font-body)', fontWeight:600, fontSize:13 } }), [])
+
+  const savePref = useCallback(<K extends keyof AppSettings>(key: K, val: AppSettings[K]) => {
+    onUpdate({ [key]: val } as Partial<AppSettings>); saved()
+  }, [onUpdate, saved])
+
+  const saveCalPref = useCallback((patch: Parameters<typeof updateCalPrefs>[0]) => {
+    updateCalPrefs(patch); saved()
+  }, [updateCalPrefs, saved])
+
+  function handlePhotoUpload(id: string, file: File) {
     const reader = new FileReader()
-    reader.onload = e => { uploadPhoto(memberId, e.target?.result as string); toast.success('Foto actualizada 📸') }
+    reader.onload = e => { uploadPhoto(id, e.target?.result as string); saved() }
     reader.readAsDataURL(file)
   }
 
-  function copyInviteCode() {
-    navigator.clipboard.writeText(settings.familyName || 'DEMO1234')
-    setCopied(true); toast.success('Código copiado')
-    setTimeout(() => setCopied(false), 2000)
+  function copyInvite() {
+    navigator.clipboard.writeText(settings.familyName?.slice(0,8).toUpperCase() || 'FAMQUEST')
+    setCopied(true); setTimeout(() => setCopied(false), 2000)
+    toast.success('Código copiado 📋', { duration:1500 })
   }
 
-  function shareWhatsApp() {
-    const msg = encodeURIComponent(`Únete a nuestra familia en FamilyQuest! Código: ${settings.familyName}`)
-    window.open(`https://wa.me/?text=${msg}`, '_blank')
-  }
+  // ── PILL SELECTOR ──
+  const PillSelect = ({ options, value, onChange }: { options:{v:string;l:string}[]; value:string; onChange:(v:string)=>void }) => (
+    <div style={{ display:'flex', background:'rgba(0,0,0,0.06)', borderRadius:10, padding:3 }}>
+      {options.map(o => (
+        <button key={o.v} onClick={() => onChange(o.v)}
+          style={{ padding:'6px 14px', borderRadius:8, border:'none', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)', background:value===o.v?'#fff':'transparent', color:value===o.v?'#1C1C1E':'#8E8E93', boxShadow:value===o.v?'0 1px 4px rgba(0,0,0,0.12)':'none', transition:'all 0.15s' }}>
+          {o.l}
+        </button>
+      ))}
+    </div>
+  )
 
-  function saveProfile() {
-    onUpdate({ familyName: profileForm.name, timeFormat: profileForm.timeFormat as any })
-    toast.success('Perfil guardado ✅')
-  }
+  // ── SECTION CONTENT ──────────────────────────────────────────────────────
+  const renderSection = () => {
+    switch (active) {
 
-  const sections: Record<SectionId, React.ReactNode> = {
-    // ── PROFILE ──
-    profile: (
+    // ── PROFILE ────────────────────────────────────────────────────────────
+    case 'profile': return (
       <div>
-        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>👤 Perfil</h1>
-        <SectionCard>
-          <div className="flex items-center gap-4 mb-5">
-            <div className="relative">
-              <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl"
-                style={{ background:'rgba(0,122,255,0.1)', border:'2px solid var(--border)' }}>
-                {members[0]?.emoji || '😊'}
-              </div>
-              <button onClick={() => toast('Próximamente: subir foto de perfil')}
-                className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full flex items-center justify-center"
-                style={{ background:'var(--blue)', color:'#fff' }}>
-                <Camera size={14} />
-              </button>
-            </div>
-            <div>
-              <p className="font-black text-lg" style={{ fontFamily:'var(--font-heading)' }}>{profileForm.name || 'Tu nombre'}</p>
-              <p className="text-sm" style={{ color:'var(--text-3)' }}>Administrador familiar</p>
-            </div>
-          </div>
+        <SectionTitle>Perfil</SectionTitle>
 
-          <div className="flex flex-col gap-3">
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider mb-1.5 block" style={{ color:'var(--text-3)' }}>Nombre</label>
-              <input value={profileForm.name} onChange={e => setProfileForm(f=>({...f,name:e.target.value}))}
-                className="input-apple" placeholder="Tu nombre completo" />
+        {/* Avatar */}
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', marginBottom:28 }}>
+          <div style={{ position:'relative', marginBottom:12 }}>
+            <div style={{ width:88, height:88, borderRadius:22, background:'linear-gradient(135deg,#FF9500,#FF6B8A)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:44 }}>
+              {members[0]?.emoji || '😊'}
             </div>
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider mb-1.5 block" style={{ color:'var(--text-3)' }}>Teléfono</label>
-              <input value={profileForm.phone} onChange={e => setProfileForm(f=>({...f,phone:e.target.value}))}
-                className="input-apple" placeholder="+1 (555) 000-0000" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider mb-1.5 block" style={{ color:'var(--text-3)' }}>Idioma</label>
-                <select value={profileForm.language} onChange={e => setProfileForm(f=>({...f,language:e.target.value}))}
-                  className="input-apple">
-                  <option value="es">🇪🇸 Español</option>
-                  <option value="en">🇺🇸 English</option>
-                  <option value="fr">🇫🇷 Français</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider mb-1.5 block" style={{ color:'var(--text-3)' }}>Hora</label>
-                <select value={profileForm.timeFormat} onChange={e => setProfileForm(f=>({...f,timeFormat:e.target.value}))}
-                  className="input-apple">
-                  <option value="12h">12h (AM/PM)</option>
-                  <option value="24h">24h</option>
-                </select>
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-bold uppercase tracking-wider mb-1.5 block" style={{ color:'var(--text-3)' }}>Zona horaria</label>
-              <select value={profileForm.timezone} onChange={e => setProfileForm(f=>({...f,timezone:e.target.value}))}
-                className="input-apple">
-                {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz.replace('_',' ')}</option>)}
-              </select>
-            </div>
+            <button onClick={() => toast('Próximamente')}
+              style={{ position:'absolute', bottom:-2, right:-2, width:28, height:28, borderRadius:'50%', background:'#007AFF', border:'3px solid #F2F2F7', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+              <Camera size={13} />
+            </button>
           </div>
-        </SectionCard>
-        <motion.button whileTap={{ scale:0.97 }} onClick={saveProfile}
-          className="btn btn-primary w-full" style={{ padding:'14px', fontSize:16 }}>
-          <Save size={16} /> Guardar cambios
+          <p style={{ fontSize:18, fontWeight:700, color:'#1C1C1E', fontFamily:'var(--font-heading)' }}>{profileName || 'Tu nombre'}</p>
+          <p style={{ fontSize:13, color:'#8E8E93' }}>Administrador</p>
+        </div>
+
+        <SettingsGroup label="Información personal">
+          <SettingsRow icon={<User size={16} color="#fff" />} iconBg="#007AFF" label="Nombre">
+            <input value={profileName} onChange={e => setProfileName(e.target.value)}
+              onBlur={() => { onUpdate({ familyName: profileName }); saved() }}
+              placeholder="Tu nombre"
+              style={{ border:'none', outline:'none', fontSize:14, color:'#8E8E93', textAlign:'right', background:'transparent', fontFamily:'var(--font-body)', width:160 }} />
+          </SettingsRow>
+          <SettingsRow icon={<span style={{ fontSize:14 }}>📱</span>} iconBg="#34C759" label="Teléfono" last>
+            <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)}
+              onBlur={saved}
+              placeholder="+1 (305) 000-0000"
+              style={{ border:'none', outline:'none', fontSize:14, color:'#8E8E93', textAlign:'right', background:'transparent', fontFamily:'var(--font-body)', width:160 }} />
+          </SettingsRow>
+        </SettingsGroup>
+
+        <SettingsGroup label="Preferencias">
+          <SettingsRow icon={<span style={{ fontSize:14 }}>🌐</span>} iconBg="#5AC8FA" label="Idioma" value={settings.language === 'en' ? 'English' : settings.language === 'fr' ? 'Français' : 'Español'}>
+            <select value={settings.language || 'es'} onChange={e => savePref('language', e.target.value as any)}
+              style={{ border:'none', outline:'none', fontSize:14, color:'#007AFF', background:'transparent', cursor:'pointer', fontFamily:'var(--font-body)', fontWeight:600 }}>
+              <option value="es">Español</option>
+              <option value="en">English</option>
+              <option value="fr">Français</option>
+            </select>
+          </SettingsRow>
+          <SettingsRow icon={<span style={{ fontSize:14 }}>🌡️</span>} iconBg="#FF9500" label="Temperatura">
+            <PillSelect options={[{v:'F',l:'°F'},{v:'C',l:'°C'}]}
+              value={settings.temperatureUnit || 'F'}
+              onChange={v => savePref('temperatureUnit', v as any)} />
+          </SettingsRow>
+          <SettingsRow icon={<span style={{ fontSize:14 }}>🕐</span>} iconBg="#AF52DE" label="Hora" last>
+            <PillSelect options={[{v:'12h',l:'12h'},{v:'24h',l:'24h'}]}
+              value={settings.timeFormat || '12h'}
+              onChange={v => savePref('timeFormat', v as any)} />
+          </SettingsRow>
+        </SettingsGroup>
+
+        <motion.button whileTap={{ scale:0.97 }} onClick={() => { onUpdate({ familyName: profileName }); saved() }}
+          style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#007AFF,#0063CC)', color:'#fff', fontSize:15, fontWeight:700, fontFamily:'var(--font-heading)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'0 4px 14px rgba(0,122,255,0.30)' }}>
+          <Save size={16} /> Guardar perfil
         </motion.button>
       </div>
-    ),
+    )
 
-    // ── FAMILY ──
-    family: (
+    // ── FAMILY ─────────────────────────────────────────────────────────────
+    case 'family': return (
       <div>
-        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>👨‍👩‍👧 Familia</h1>
+        <SectionTitle>Familia</SectionTitle>
 
         {/* Invite code */}
-        <SectionCard>
-          <p className="font-bold text-sm mb-1" style={{ fontFamily:'var(--font-heading)' }}>Código de invitación</p>
-          <p className="text-xs mb-3" style={{ color:'var(--text-3)' }}>Compártelo para que otros se unan</p>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 px-4 py-3 rounded-2xl font-mono font-bold text-xl tracking-widest text-center"
-              style={{ background:'rgba(0,122,255,0.08)', color:'var(--blue)', border:'1.5px solid rgba(0,122,255,0.2)' }}>
-              {settings.familyName?.slice(0,8).toUpperCase() || 'FAMQUEST'}
+        <SettingsGroup label="Código de invitación">
+          <SettingsRow label="Código" sub="Compártelo para que otros se unan" icon={<span style={{ fontSize:14 }}>🔗</span>} iconBg="#FF9500" last>
+            <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:15, fontWeight:800, color:'#007AFF', fontFamily:'monospace', letterSpacing:'0.1em', background:'rgba(0,122,255,0.08)', padding:'4px 10px', borderRadius:8 }}>
+                {settings.familyName?.slice(0,8).toUpperCase() || 'FAMQUEST'}
+              </span>
+              <button onClick={copyInvite}
+                style={{ width:32, height:32, borderRadius:8, border:'none', background: copied ? 'rgba(52,199,89,0.12)' : 'rgba(0,122,255,0.10)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color: copied ? '#34C759' : '#007AFF' }}>
+                {copied ? <Check size={15} /> : <Copy size={15} />}
+              </button>
+              <button onClick={() => { const msg=encodeURIComponent(`Únete a FamilyQuest! Código: ${settings.familyName?.slice(0,8).toUpperCase()}`); window.open(`https://wa.me/?text=${msg}`) }}
+                style={{ width:32, height:32, borderRadius:8, border:'none', background:'rgba(37,211,102,0.12)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#25D366' }}>
+                <Share2 size={15} />
+              </button>
             </div>
-            <button onClick={copyInviteCode} className="btn-icon" title="Copiar">
-              {copied ? <Check size={18} style={{ color:'var(--green)' }} /> : <Copy size={18} />}
-            </button>
-            <button onClick={shareWhatsApp} className="btn-icon" title="Compartir por WhatsApp"
-              style={{ background:'#25D366', color:'#fff', border:'none' }}>
-              <Share2 size={18} />
-            </button>
-          </div>
-        </SectionCard>
+          </SettingsRow>
+        </SettingsGroup>
 
         {/* Members */}
-        <SectionCard>
-          <div className="flex items-center justify-between mb-4">
-            <p className="font-bold" style={{ fontFamily:'var(--font-heading)' }}>Miembros ({members.length})</p>
-            <button onClick={() => setShowAddMember(true)} className="btn btn-primary" style={{ padding:'8px 16px', fontSize:13 }}>
-              <Plus size={14} /> Agregar
-            </button>
-          </div>
-
-          {members.map(m => (
-            <div key={m.id} className="flex items-center gap-3 py-3 border-b last:border-0" style={{ borderColor:'var(--border)' }}>
-              <div className="relative">
+        <SettingsGroup label={`Miembros (${members.length})`}>
+          {members.map((m, idx) => (
+            <div key={m.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderBottom: idx < members.length-1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
+              <div style={{ position:'relative' }}>
                 <MemberAvatar member={m} size={46} />
                 <button onClick={() => fileRefs.current[m.id]?.click()}
-                  className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
-                  style={{ background:'var(--blue)', color:'#fff' }}>
-                  <Camera size={10} />
+                  style={{ position:'absolute', bottom:-2, right:-2, width:18, height:18, borderRadius:'50%', background:'#007AFF', border:'2px solid #F2F2F7', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+                  <Camera size={9} />
                 </button>
-                <input ref={el=>{ if(el) fileRefs.current[m.id]=el }} type="file" accept="image/*" style={{ display:'none' }}
-                  onChange={e => { const f=e.target.files?.[0]; if(f) handlePhotoUpload(m.id,f) }} />
+                <input ref={el=>{if(el)fileRefs.current[m.id]=el}} type="file" accept="image/*" style={{ display:'none' }}
+                  onChange={e=>{const f=e.target.files?.[0];if(f)handlePhotoUpload(m.id,f)}} />
               </div>
 
               {editingId === m.id ? (
-                <div className="flex-1 flex gap-2">
+                <div style={{ flex:1, display:'flex', gap:8 }}>
                   <input value={editName} onChange={e=>setEditName(e.target.value)} autoFocus
-                    className="input-apple flex-1" style={{ padding:'8px 12px', fontSize:14 }} />
-                  <button onClick={() => { updateMember(m.id,{name:editName}); setEditingId(null); toast.success('Guardado') }}
-                    className="btn-icon" style={{ color:'var(--green)' }}><Check size={16} /></button>
-                  <button onClick={() => setEditingId(null)} className="btn-icon"><X size={16} /></button>
+                    style={{ flex:1, padding:'8px 12px', borderRadius:10, border:'1.5px solid #007AFF', fontSize:14, fontFamily:'var(--font-body)', outline:'none', background:'rgba(0,122,255,0.04)' }} />
+                  <button onClick={() => { updateMember(m.id,{name:editName}); setEditingId(null); saved() }}
+                    style={{ width:34, height:34, borderRadius:10, background:'rgba(52,199,89,0.12)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', color:'#34C759' }}>
+                    <Check size={16} />
+                  </button>
+                  <button onClick={() => setEditingId(null)}
+                    style={{ width:34, height:34, borderRadius:10, background:'rgba(0,0,0,0.06)', border:'none', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                    <X size={16} color="#8E8E93" />
+                  </button>
                 </div>
               ) : (
                 <>
-                  <div className="flex-1">
-                    <p className="font-bold text-sm">{m.name}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs capitalize px-2 py-0.5 rounded-full font-semibold"
-                        style={{ background:m.bgColor, color:m.textColor }}>{m.role}</span>
-                      <span className="text-xs" style={{ color:'var(--text-3)' }}>⭐ pts</span>
+                  <div style={{ flex:1 }}>
+                    <p style={{ fontSize:15, fontWeight:600, color:'#1C1C1E', fontFamily:'var(--font-body)' }}>{m.name}</p>
+                    <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:3 }}>
+                      <span style={{ fontSize:11, fontWeight:600, color:m.textColor, background:m.bgColor, padding:'2px 8px', borderRadius:99, textTransform:'capitalize' }}>{m.role}</span>
                     </div>
                   </div>
-                  <div className="flex gap-1.5">
-                    {/* Color selector dots */}
-                    <div className="relative">
+                  <div style={{ display:'flex', gap:6 }}>
+                    {/* Emoji change */}
+                    <div style={{ position:'relative' }}>
                       <button onClick={() => setShowEmojiFor(showEmojiFor===m.id?null:m.id)}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-lg"
-                        style={{ background:'var(--bg)', border:'1px solid var(--border)' }}>
+                        style={{ width:34, height:34, borderRadius:10, border:'1px solid rgba(0,0,0,0.10)', background:'rgba(255,255,255,0.90)', cursor:'pointer', fontSize:18, display:'flex', alignItems:'center', justifyContent:'center' }}>
                         {m.emoji}
                       </button>
                       <AnimatePresence>
                         {showEmojiFor===m.id && (
-                          <motion.div initial={{ opacity:0,scale:0.95 }} animate={{ opacity:1,scale:1 }} exit={{ opacity:0,scale:0.95 }}
+                          <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:0.95}}
                             style={{ position:'absolute', top:'110%', right:0, zIndex:99 }}>
-                            <EmojiPicker value={m.emoji} onChange={e => { updateMember(m.id,{emoji:e}); setShowEmojiFor(null) }} onClose={() => setShowEmojiFor(null)} />
+                            <EmojiPicker value={m.emoji} onChange={e=>{updateMember(m.id,{emoji:e});setShowEmojiFor(null);saved()}} onClose={()=>setShowEmojiFor(null)} />
                           </motion.div>
                         )}
                       </AnimatePresence>
                     </div>
-                    <button onClick={() => { setEditingId(m.id); setEditName(m.name) }} className="btn-icon">
-                      <Edit2 size={14} />
+                    <button onClick={()=>{setEditingId(m.id);setEditName(m.name)}}
+                      style={{ width:34, height:34, borderRadius:10, border:'1px solid rgba(0,0,0,0.10)', background:'rgba(255,255,255,0.90)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <Edit2 size={14} color="#8E8E93" />
                     </button>
-                    <button onClick={() => { if(confirm(`¿Eliminar a ${m.name}?`)) removeMember(m.id) }}
-                      className="btn-icon" style={{ color:'var(--red)' }}>
-                      <Trash2 size={14} />
+                    <button onClick={()=>{if(confirm(`¿Eliminar a ${m.name}?`))removeMember(m.id)}}
+                      style={{ width:34, height:34, borderRadius:10, border:'none', background:'rgba(255,59,48,0.10)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                      <Trash2 size={14} color="#FF3B30" />
                     </button>
                   </div>
                 </>
               )}
             </div>
           ))}
-        </SectionCard>
 
-        {/* Add member form */}
+          {/* Add member button */}
+          <div style={{ padding:'0 16px 4px' }}>
+            <button onClick={() => setShowAddMember(true)}
+              style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px dashed rgba(0,122,255,0.3)', background:'rgba(0,122,255,0.04)', color:'#007AFF', fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:'var(--font-body)', marginTop:8, marginBottom:4 }}>
+              <Plus size={16} /> Agregar miembro
+            </button>
+          </div>
+        </SettingsGroup>
+
+        {/* Add member modal */}
         <AnimatePresence>
           {showAddMember && (
-            <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
-              className="modal-overlay" onClick={e => e.target===e.currentTarget && setShowAddMember(false)}>
-              <motion.div initial={{ y:60,opacity:0 }} animate={{ y:0,opacity:1 }} exit={{ y:60,opacity:0 }}
-                transition={{ type:'spring',stiffness:340,damping:30 }} className="modal-sheet">
-                <div className="w-10 h-1 rounded-full bg-gray-200 mx-auto mb-4" />
-                <h2 className="font-black text-xl mb-4" style={{ fontFamily:'var(--font-heading)' }}>Agregar miembro</h2>
-                <div className="flex flex-col gap-4">
-                  <div className="flex gap-3 items-center">
-                    <div className="relative">
-                      <button onClick={() => setShowEmojiFor('new')}
-                        className="card w-14 h-14 flex items-center justify-center text-3xl">
-                        {newMemberForm.emoji}
-                      </button>
-                      <AnimatePresence>
-                        {showEmojiFor==='new' && (
-                          <motion.div initial={{ opacity:0,scale:0.95 }} animate={{ opacity:1,scale:1 }} exit={{ opacity:0,scale:0.95 }}
-                            style={{ position:'absolute',top:'110%',left:0,zIndex:99 }}>
-                            <EmojiPicker value={newMemberForm.emoji} onChange={e=>{setNewMemberForm(f=>({...f,emoji:e}));setShowEmojiFor(null)}} onClose={()=>setShowEmojiFor(null)} />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                    <input value={newMemberForm.name} onChange={e=>setNewMemberForm(f=>({...f,name:e.target.value}))}
-                      placeholder="Nombre del miembro" autoFocus className="input-apple flex-1" />
+            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+              onClick={e=>e.target===e.currentTarget&&setShowAddMember(false)}
+              style={{ position:'fixed',inset:0,zIndex:50,background:'rgba(0,0,0,0.30)',backdropFilter:'blur(8px)',display:'flex',alignItems:'flex-end',justifyContent:'center' }}>
+              <motion.div initial={{y:60,opacity:0}} animate={{y:0,opacity:1}} exit={{y:60,opacity:0}}
+                transition={{type:'spring',stiffness:340,damping:30}}
+                style={{ width:'100%',maxWidth:480,background:'rgba(255,251,247,0.98)',backdropFilter:'blur(40px)',borderRadius:'28px 28px 0 0',padding:'12px 24px 32px',boxShadow:'0 -4px 40px rgba(0,0,0,0.12)' }}>
+                <div style={{ width:36,height:4,borderRadius:99,background:'rgba(0,0,0,0.12)',margin:'0 auto 18px' }} />
+                <h2 style={{ fontSize:20,fontWeight:900,fontFamily:'var(--font-heading)',marginBottom:18 }}>Agregar miembro</h2>
+                <div style={{ display:'flex',gap:10,alignItems:'center',marginBottom:14 }}>
+                  <div style={{ position:'relative' }}>
+                    <button onClick={()=>setShowEmojiFor('new')}
+                      style={{ width:56,height:56,borderRadius:16,border:'1.5px solid rgba(0,0,0,0.10)',background:'rgba(255,255,255,0.90)',fontSize:28,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center' }}>
+                      {newMember.emoji}
+                    </button>
+                    <AnimatePresence>
+                      {showEmojiFor==='new' && (
+                        <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:0.95}} style={{ position:'absolute',top:'110%',left:0,zIndex:99 }}>
+                          <EmojiPicker value={newMember.emoji} onChange={e=>{setNewMember(f=>({...f,emoji:e}));setShowEmojiFor(null)}} onClose={()=>setShowEmojiFor(null)} />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                  <div className="flex gap-2">
-                    {[{v:'adult',l:'👨 Adulto'},{v:'child',l:'👦 Niño/a'}].map(opt=>(
-                      <button key={opt.v} onClick={()=>setNewMemberForm(f=>({...f,role:opt.v as any}))}
-                        className="flex-1 py-3 rounded-2xl font-bold text-sm transition-all"
-                        style={{ background:newMemberForm.role===opt.v?'rgba(0,122,255,0.1)':'var(--bg)', color:newMemberForm.role===opt.v?'var(--blue)':'var(--text-2)', border:`2px solid ${newMemberForm.role===opt.v?'var(--blue)':'var(--border)'}` }}>
-                        {opt.l}
-                      </button>
-                    ))}
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold uppercase tracking-wider mb-2 block" style={{ color:'var(--text-3)' }}>Color</label>
-                    <div className="flex gap-2 flex-wrap">
-                      {COLOR_OPTIONS.map((c,i)=>(
-                        <button key={i} onClick={()=>setNewMemberForm(f=>({...f,colorIdx:i}))}
-                          title={`Color ${i+1}`}
-                          style={{ width:28,height:28,borderRadius:'50%',background:c.bar,border:`3px solid ${newMemberForm.colorIdx===i?'var(--text-1)':'transparent'}`,boxShadow:newMemberForm.colorIdx===i?`0 0 0 2px var(--surface)`:undefined }} />
-                      ))}
-                    </div>
-                  </div>
-                  <motion.button whileTap={{scale:0.97}} onClick={()=>{
-                    if(!newMemberForm.name.trim()) return
-                    const c=COLOR_OPTIONS[newMemberForm.colorIdx]
-                    addMember({name:newMemberForm.name.trim(),emoji:newMemberForm.emoji,bgColor:c.bg,textColor:c.text,barColor:c.bar,role:newMemberForm.role})
-                    setNewMemberForm({name:'',emoji:'👤',colorIdx:0,role:'child'})
-                    setShowAddMember(false)
-                    toast.success('Miembro agregado 👋')
-                  }} className="btn btn-primary w-full" style={{ padding:'14px',fontSize:16 }}>
-                    Agregar miembro
-                  </motion.button>
+                  <input value={newMember.name} onChange={e=>setNewMember(f=>({...f,name:e.target.value}))} placeholder="Nombre" autoFocus
+                    style={{ flex:1,padding:'13px 16px',borderRadius:12,border:'1.5px solid rgba(0,0,0,0.10)',fontSize:15,fontFamily:'var(--font-body)',outline:'none',background:'rgba(255,255,255,0.90)' }} />
                 </div>
+                <div style={{ display:'flex',gap:8,marginBottom:14 }}>
+                  {[{v:'adult',l:'👨 Adulto'},{v:'child',l:'👦 Niño/a'}].map(opt=>(
+                    <button key={opt.v} onClick={()=>setNewMember(f=>({...f,role:opt.v as any}))}
+                      style={{ flex:1,padding:'10px',borderRadius:12,border:`1.5px solid ${newMember.role===opt.v?'#007AFF':'rgba(0,0,0,0.10)'}`,background:newMember.role===opt.v?'rgba(0,122,255,0.08)':'rgba(255,255,255,0.90)',color:newMember.role===opt.v?'#007AFF':'#3C3C43',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-body)' }}>
+                      {opt.l}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display:'flex',gap:8,marginBottom:18,flexWrap:'wrap' }}>
+                  {COLOR_OPTIONS.map((c,i)=>(
+                    <button key={i} onClick={()=>setNewMember(f=>({...f,colorIdx:i}))}
+                      style={{ width:32,height:32,borderRadius:'50%',background:c.bar,border:`3px solid ${newMember.colorIdx===i?'#1C1C1E':'transparent'}`,cursor:'pointer',boxShadow:newMember.colorIdx===i?`0 0 0 2px rgba(255,255,255,0.9)`:undefined }} />
+                  ))}
+                </div>
+                <motion.button whileTap={{scale:0.97}} onClick={()=>{
+                  if(!newMember.name.trim())return
+                  const c=COLOR_OPTIONS[newMember.colorIdx]
+                  addMember({name:newMember.name.trim(),emoji:newMember.emoji,bgColor:c.bg,textColor:c.text,barColor:c.bar,role:newMember.role})
+                  setNewMember({name:'',emoji:'👤',colorIdx:0,role:'child'})
+                  setShowAddMember(false); saved()
+                }} style={{ width:'100%',padding:'14px',borderRadius:14,border:'none',background:'linear-gradient(135deg,#007AFF,#0063CC)',color:'#fff',fontSize:15,fontWeight:700,fontFamily:'var(--font-heading)',cursor:'pointer',boxShadow:'0 4px 14px rgba(0,122,255,0.30)' }}>
+                  Agregar
+                </motion.button>
               </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-    ),
+    )
 
-    // ── APPEARANCE ──
-    appearance: (
+    // ── APPEARANCE ─────────────────────────────────────────────────────────
+    case 'appearance': return (
       <div>
-        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>🎨 Apariencia</h1>
+        <SectionTitle>Apariencia</SectionTitle>
 
-        <SectionCard>
-          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)' }}>Modo de color</p>
-          <div className="flex gap-2">
-            {[{v:'light',l:'☀️ Claro'},{v:'dark',l:'🌙 Oscuro'},{v:'system',l:'💻 Sistema'}].map(opt=>(
-              <button key={opt.v} className="flex-1 py-2.5 rounded-2xl font-bold text-sm transition-all"
-                style={{ background:appTheme==='default'&&opt.v==='light'?'rgba(0,122,255,0.1)':'var(--bg)', color:appTheme==='default'&&opt.v==='light'?'var(--blue)':'var(--text-2)', border:`1.5px solid ${appTheme==='default'&&opt.v==='light'?'var(--blue)':'var(--border)'}` }}>
-                {opt.l}
-              </button>
-            ))}
-          </div>
-        </SectionCard>
+        <SettingsGroup label="Modo de color">
+          <SettingsRow icon={<span style={{ fontSize:14 }}>☀️</span>} iconBg="#FF9500" label="Modo" last>
+            <PillSelect options={[{v:'light',l:'Claro'},{v:'dark',l:'Oscuro'},{v:'system',l:'Auto'}]}
+              value={settings.theme || 'light'} onChange={v => savePref('theme', v as any)} />
+          </SettingsRow>
+        </SettingsGroup>
 
-        <SectionCard>
-          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)' }}>Temas prediseñados</p>
-          <div className="grid grid-cols-3 gap-2">
-            {THEMES.map(t=>(
-              <button key={t.id} onClick={() => { setAppTheme(t.id); toast.success(`Tema ${t.label} activado`) }}
-                className="p-3 rounded-2xl text-center transition-all"
-                style={{ border:`2px solid ${appTheme===t.id?t.colors[0]:'var(--border)'}`, background:appTheme===t.id?`${t.colors[0]}12`:'var(--bg)' }}>
-                <div className="flex justify-center gap-1 mb-2">
-                  <div className="w-5 h-5 rounded-full" style={{ background:t.colors[0] }} />
-                  <div className="w-5 h-5 rounded-full" style={{ background:t.colors[1] }} />
-                </div>
-                <p className="text-xs font-bold" style={{ color:appTheme===t.id?t.colors[0]:'var(--text-2)' }}>{t.label}</p>
-              </button>
-            ))}
-          </div>
-        </SectionCard>
+        <SettingsGroup label="Fuente">
+          <SettingsRow icon={<span style={{ fontSize:14 }}>Aa</span>} iconBg="#AF52DE" label="Tamaño de letra" last>
+            <PillSelect options={[{v:'small',l:'S'},{v:'normal',l:'M'},{v:'large',l:'L'},{v:'xlarge',l:'XL'}]}
+              value={settings.fontSize as string || 'normal'} onChange={v => savePref('fontSize' as any, v)} />
+          </SettingsRow>
+        </SettingsGroup>
 
-        <SectionCard>
-          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)' }}>Color de acento</p>
-          <div className="flex gap-2 flex-wrap">
-            {ACCENT_COLORS.map(c=>(
-              <button key={c} onClick={() => { setAccentColor(c); toast.success('Color actualizado') }}
-                style={{ width:32,height:32,borderRadius:'50%',background:c,border:`3px solid ${accentColor===c?'var(--text-1)':'transparent'}`,boxShadow:accentColor===c?`0 0 0 2px var(--surface)`:undefined }} />
-            ))}
-          </div>
-        </SectionCard>
-
-        <SectionCard>
-          <div className="settings-row">
-            <span className="font-semibold text-sm">Tamaño de fuente</span>
-            <div className="flex gap-1.5">
-              {['S','M','L','XL'].map((s,i)=>{
-                const vals=['small','normal','large','xlarge']
-                return <button key={s} onClick={()=>setFontSize(vals[i])}
-                  className="w-8 h-8 rounded-xl font-bold text-sm transition-all"
-                  style={{ background:fontSize===vals[i]?'var(--blue)':'var(--bg)', color:fontSize===vals[i]?'#fff':'var(--text-2)', border:`1px solid ${fontSize===vals[i]?'var(--blue)':'var(--border)'}` }}>{s}</button>
-              })}
-            </div>
-          </div>
-          <div className="settings-row">
-            <span className="font-semibold text-sm">Densidad calendario</span>
-            <div className="flex gap-1.5">
-              {[{v:'compact',l:'Compact'},{v:'normal',l:'Normal'},{v:'spacious',l:'Espacioso'}].map(opt=>(
-                <button key={opt.v} onClick={()=>setCalDensity(opt.v)}
-                  className="pill"
-                  style={{ background:calDensity===opt.v?'var(--blue)':'var(--bg)', color:calDensity===opt.v?'#fff':'var(--text-2)', border:`1.5px solid ${calDensity===opt.v?'var(--blue)':'var(--border)'}` }}>
-                  {opt.l}
-                </button>
+        <SettingsGroup label="Color de acento">
+          <div style={{ padding:'16px' }}>
+            <div style={{ display:'flex', gap:12, flexWrap:'wrap', justifyContent:'center' }}>
+              {['#007AFF','#34C759','#FF3B30','#FF9500','#AF52DE','#5856D6','#FF2D55','#00C7BE','#FFCC00','#FF6B00'].map(c=>(
+                <button key={c} onClick={() => savePref('accentColor' as any, c)}
+                  style={{ width:36, height:36, borderRadius:'50%', background:c, border:`3px solid ${(settings as any).accentColor===c?'#1C1C1E':'transparent'}`, cursor:'pointer', boxShadow:(settings as any).accentColor===c?`0 0 0 2px rgba(255,255,255,0.9)`:undefined }} />
               ))}
             </div>
           </div>
-        </SectionCard>
+        </SettingsGroup>
       </div>
-    ),
+    )
 
-    // ── NOTIFICATIONS ──
-    notifications: (
+    // ── NOTIFICATIONS ──────────────────────────────────────────────────────
+    case 'notifications': return (
       <div>
-        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>🔔 Notificaciones</h1>
+        <SectionTitle>Notificaciones</SectionTitle>
 
-        <SectionCard>
-          <div className="settings-row">
-            <div>
-              <p className="font-bold text-sm">Notificaciones</p>
-              <p className="text-xs" style={{ color:'var(--text-3)' }}>Activar/desactivar todas</p>
-            </div>
-            <Toggle value={notifMaster} onChange={v => { setNotifMaster(v); onUpdate({ notifications:v }) }} />
-          </div>
-        </SectionCard>
+        <SettingsGroup>
+          <SettingsRow icon={<Bell size={16} color="#fff" />} iconBg="#FF3B30" label="Notificaciones" sub="Activar o desactivar todas" last>
+            <Toggle value={notifMaster} onChange={v => { setNotifMaster(v); savePref('notifications', v) }} />
+          </SettingsRow>
+        </SettingsGroup>
 
-        <SectionCard>
-          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)' }}>Por tipo</p>
+        <SettingsGroup label="Por tipo">
           {[
-            { k:'taskReminder', l:'Recordatorio de task', sub:'Antes de que venza un task' },
-            { k:'taskDone',     l:'Task completado',      sub:'Cuando un hijo termina un task' },
-            { k:'newEvent',     l:'Nuevo evento',         sub:'Eventos añadidos al calendario' },
-            { k:'chat',         l:'Chat familiar',        sub:'Mensajes del chat' },
-            { k:'achievement',  l:'Logro desbloqueado',   sub:'Cuando alguien consigue un logro' },
-            { k:'reward',       l:'Premio reclamado',     sub:'Solicitudes de recompensa' },
-          ].map(item=>(
-            <div key={item.k} className="settings-row" style={{ opacity:notifMaster?1:0.4 }}>
-              <div>
-                <p className="font-semibold text-sm">{item.l}</p>
-                <p className="text-xs" style={{ color:'var(--text-3)' }}>{item.sub}</p>
-              </div>
-              <Toggle value={(notifTypes as any)[item.k]} onChange={v=>setNotifTypes(t=>({...t,[item.k]:v}))} disabled={!notifMaster} />
-            </div>
+            { k:'taskReminder', l:'Recordatorio de task',   s:'Antes de que venza',          bg:'#FF9500' },
+            { k:'taskDone',     l:'Task completado',        s:'Cuando un hijo termina',       bg:'#34C759' },
+            { k:'newEvent',     l:'Nuevo evento',           s:'Eventos en el calendario',     bg:'#007AFF' },
+            { k:'achievement',  l:'Logro desbloqueado',     s:'¡Felicidades!',                bg:'#FFCC00' },
+            { k:'reward',       l:'Premio reclamado',       s:'Solicitudes de recompensa',    bg:'#AF52DE' },
+          ].map((item, i, arr) => (
+            <SettingsRow key={item.k} icon={<Bell size={14} color="#fff" />} iconBg={item.bg}
+              label={item.l} sub={item.s} last={i===arr.length-1}>
+              <Toggle size="sm" value={(notifTypes as any)[item.k]} disabled={!notifMaster}
+                onChange={v => setNotifTypes(t=>({...t,[item.k]:v}))} />
+            </SettingsRow>
           ))}
-        </SectionCard>
+        </SettingsGroup>
 
-        <SectionCard>
-          <div className="settings-row">
-            <div>
-              <p className="font-bold text-sm">Horas de silencio</p>
-              <p className="text-xs" style={{ color:'var(--text-3)' }}>Sin notificaciones en este rango</p>
-            </div>
-            <Toggle value={silentHours} onChange={setSilentHours} />
-          </div>
+        <SettingsGroup label="Horas de silencio">
+          <SettingsRow icon={<span style={{ fontSize:14 }}>🌙</span>} iconBg="#636366" label="Silenciar notificaciones">
+            <Toggle value={silentHours} onChange={v => { setSilentHours(v); saved() }} />
+          </SettingsRow>
           {silentHours && (
-            <div className="flex items-center gap-3 mt-3">
-              <div className="flex-1">
-                <label className="text-xs font-semibold mb-1 block" style={{ color:'var(--text-3)' }}>Desde</label>
-                <input type="time" value={silentFrom} onChange={e=>setSilentFrom(e.target.value)} className="input-apple" />
-              </div>
-              <div className="flex-1">
-                <label className="text-xs font-semibold mb-1 block" style={{ color:'var(--text-3)' }}>Hasta</label>
-                <input type="time" value={silentTo} onChange={e=>setSilentTo(e.target.value)} className="input-apple" />
-              </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, padding:'0 16px 14px' }}>
+              {[{l:'Desde',v:silentFrom,s:setSilentFrom},{l:'Hasta',v:silentTo,s:setSilentTo}].map(f=>(
+                <div key={f.l}>
+                  <p style={{ fontSize:11,fontWeight:600,color:'#8E8E93',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.05em' }}>{f.l}</p>
+                  <input type="time" value={f.v} onChange={e=>{f.s(e.target.value);saved()}}
+                    style={{ width:'100%',padding:'10px 12px',borderRadius:10,border:'1px solid rgba(0,0,0,0.10)',fontSize:14,fontFamily:'var(--font-body)',outline:'none',color:'#1C1C1E',background:'rgba(255,255,255,0.90)' }} />
+                </div>
+              ))}
             </div>
           )}
-        </SectionCard>
+        </SettingsGroup>
       </div>
-    ),
+    )
 
-    // ── GAMIFICATION ──
-    gamification: (
+    // ── GAMIFICATION ───────────────────────────────────────────────────────
+    case 'gamification': return (
       <div>
-        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>🏆 Gamificación</h1>
-
-        <SectionCard>
-          <div className="settings-row">
-            <div>
-              <p className="font-bold text-sm">Sistema de puntos</p>
-              <p className="text-xs" style={{ color:'var(--text-3)' }}>Los hijos ganan puntos al completar tasks</p>
-            </div>
+        <SectionTitle>Gamificación</SectionTitle>
+        <SettingsGroup>
+          <SettingsRow icon={<span style={{ fontSize:14 }}>⭐</span>} iconBg="#FFCC00" label="Sistema de puntos" sub="Los hijos ganan puntos al completar tasks">
             <Toggle value={true} onChange={() => toast('Próximamente')} />
-          </div>
-          <div className="settings-row">
-            <div>
-              <p className="font-bold text-sm">Rachas</p>
-              <p className="text-xs" style={{ color:'var(--text-3)' }}>Días consecutivos completando tasks</p>
-            </div>
+          </SettingsRow>
+          <SettingsRow icon={<span style={{ fontSize:14 }}>🔥</span>} iconBg="#FF9500" label="Rachas" sub="Días consecutivos completando tasks" last>
             <Toggle value={true} onChange={() => toast('Próximamente')} />
-          </div>
-          <div className="settings-row">
-            <span className="font-semibold text-sm">Puntos por defecto</span>
-            <input type="number" defaultValue={10} min={1} max={100}
-              className="input-apple" style={{ width:80, textAlign:'center', padding:'8px' }} />
-          </div>
-        </SectionCard>
+          </SettingsRow>
+        </SettingsGroup>
 
-        <SectionCard>
-          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)' }}>🏅 Logros disponibles</p>
-          {[
-            { e:'🌟', t:'Primera Tarea', d:'Completar el primer task', pts:50 },
-            { e:'🔥', t:'Racha de 7 días', d:'7 días consecutivos', pts:100 },
-            { e:'💯', t:'Perfeccionista', d:'100 tasks completados', pts:500 },
-            { e:'👑', t:'Campeón', d:'1000 puntos acumulados', pts:1000 },
-          ].map((a,i)=>(
-            <div key={i} className="flex items-center gap-3 py-2.5 border-b last:border-0" style={{ borderColor:'var(--border)' }}>
-              <span className="text-2xl">{a.e}</span>
-              <div className="flex-1">
-                <p className="font-bold text-sm">{a.t}</p>
-                <p className="text-xs" style={{ color:'var(--text-3)' }}>{a.d}</p>
-              </div>
-              <span className="text-xs font-bold" style={{ color:'var(--orange)' }}>⭐{a.pts}</span>
-            </div>
+        <SettingsGroup label="Logros disponibles">
+          {[{e:'🌟',t:'Primera Tarea',d:'Completar el primer task'},{e:'🔥',t:'Racha de 7 días',d:'7 días consecutivos'},{e:'💯',t:'Perfeccionista',d:'100 tasks completados'},{e:'👑',t:'Campeón',d:'1000 puntos acumulados'}].map((a,i,arr)=>(
+            <SettingsRow key={a.t} icon={<span style={{ fontSize:16 }}>{a.e}</span>} iconBg="transparent" label={a.t} sub={a.d} last={i===arr.length-1} />
           ))}
-        </SectionCard>
+        </SettingsGroup>
       </div>
-    ),
+    )
 
-    // ── CALENDAR ──
-    calendar: (
+    // ── CALENDAR ───────────────────────────────────────────────────────────
+    case 'calendar': return (
       <div>
-        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>📅 Calendario</h1>
+        <SectionTitle>Calendario</SectionTitle>
 
-        {/* Live preview badge */}
-        <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 16px', borderRadius:12, background:'rgba(0,122,255,0.08)', border:'1px solid rgba(0,122,255,0.20)', marginBottom:16 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', borderRadius:12, background:'rgba(0,122,255,0.08)', border:'1px solid rgba(0,122,255,0.20)', marginBottom:20 }}>
           <span style={{ fontSize:18 }}>✨</span>
-          <p style={{ fontSize:13, fontWeight:600, color:'var(--blue)', fontFamily:'var(--font-body)' }}>
-            Los cambios se guardan automáticamente — no necesitas botón de guardar
-          </p>
+          <p style={{ fontSize:13, fontWeight:600, color:'#007AFF', fontFamily:'var(--font-body)' }}>Cambios instantáneos — sin botón de guardar</p>
         </div>
 
-        <SectionCard>
-          {/* Vista por defecto */}
-          <div className="settings-row">
-            <div>
-              <p className="font-bold text-sm">Vista por defecto</p>
-              <p className="text-xs mt-0.5" style={{ color:'var(--text-3)' }}>
-                Actualmente: <strong style={{ color:'var(--blue)' }}>
-                  {calPrefs.defaultView === 'week' ? 'Semana' : calPrefs.defaultView === 'day' ? 'Día' : calPrefs.defaultView === 'month' ? 'Mes' : 'Agenda'}
-                </strong>
-              </p>
-            </div>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-              {[{v:'week',l:'Semana'},{v:'day',l:'Día'},{v:'month',l:'Mes'},{v:'agenda',l:'Agenda'}].map(opt=>(
-                <motion.button key={opt.v} whileTap={{scale:0.93}}
-                  onClick={() => saveCalPref({ defaultView: opt.v as any })}
-                  style={{
-                    padding:'7px 16px', borderRadius:99,
-                    border:`2px solid ${calPrefs.defaultView===opt.v?'var(--blue)':'rgba(0,0,0,0.08)'}`,
-                    background: calPrefs.defaultView===opt.v?'rgba(0,122,255,0.10)':'rgba(255,255,255,0.80)',
-                    color: calPrefs.defaultView===opt.v?'var(--blue)':'var(--text-2)',
-                    fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)',
-                    boxShadow: calPrefs.defaultView===opt.v?'0 2px 8px rgba(0,122,255,0.20)':'none',
-                    transition:'all 0.15s',
-                  }}>
-                  {opt.l}
-                </motion.button>
-              ))}
-            </div>
-          </div>
+        <SettingsGroup label="Vista">
+          <SettingsRow icon={<CalendarDays size={16} color="#fff" />} iconBg="#34C759" label="Vista por defecto"
+            value={calPrefs.defaultView==='week'?'Semana':calPrefs.defaultView==='day'?'Día':calPrefs.defaultView==='month'?'Mes':'Agenda'} last>
+            <PillSelect options={[{v:'week',l:'Semana'},{v:'day',l:'Día'},{v:'month',l:'Mes'},{v:'agenda',l:'Agenda'}]}
+              value={calPrefs.defaultView} onChange={v => saveCalPref({ defaultView: v as any })} />
+          </SettingsRow>
+        </SettingsGroup>
 
-          {/* Show tasks */}
-          <div className="settings-row">
-            <div>
-              <p className="font-bold text-sm">Mostrar tasks en calendario</p>
-              <p className="text-xs" style={{ color:'var(--text-3)' }}>Tasks con hora aparecen en su slot</p>
-            </div>
+        <SettingsGroup label="Opciones">
+          <SettingsRow icon={<span style={{ fontSize:14 }}>📋</span>} iconBg="#007AFF" label="Mostrar tasks" sub="Tasks con hora en su slot">
             <Toggle value={calPrefs.showTasks} onChange={v => saveCalPref({ showTasks: v })} />
-          </div>
-
-          {/* Week starts on */}
-          <div className="settings-row">
-            <div>
-              <p className="font-bold text-sm">La semana empieza en</p>
-              <p className="text-xs mt-0.5" style={{ color:'var(--text-3)' }}>
-                Actualmente: <strong style={{ color:'var(--blue)' }}>
-                  {calPrefs.weekStartsOn === 'monday' ? 'Lunes' : 'Domingo'}
-                </strong>
-              </p>
-            </div>
-            <div style={{ display:'flex', gap:6 }}>
-              {[{v:'monday',l:'Lunes'},{v:'sunday',l:'Domingo'}].map(opt=>(
-                <motion.button key={opt.v} whileTap={{scale:0.93}}
-                  onClick={() => saveCalPref({ weekStartsOn: opt.v as any })}
-                  style={{
-                    padding:'7px 16px', borderRadius:99,
-                    border:`2px solid ${calPrefs.weekStartsOn===opt.v?'var(--blue)':'rgba(0,0,0,0.08)'}`,
-                    background: calPrefs.weekStartsOn===opt.v?'rgba(0,122,255,0.10)':'rgba(255,255,255,0.80)',
-                    color: calPrefs.weekStartsOn===opt.v?'var(--blue)':'var(--text-2)',
-                    fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)',
-                    transition:'all 0.15s',
-                  }}>
-                  {opt.l}
-                </motion.button>
-              ))}
-            </div>
-          </div>
-
-          {/* Show weekends */}
-          <div className="settings-row">
-            <div>
-              <p className="font-bold text-sm">Mostrar fines de semana</p>
-              <p className="text-xs" style={{ color:'var(--text-3)' }}>Sábado y domingo visibles en la vista semanal</p>
-            </div>
+          </SettingsRow>
+          <SettingsRow icon={<span style={{ fontSize:14 }}>📅</span>} iconBg="#FF9500" label="La semana empieza en">
+            <PillSelect options={[{v:'monday',l:'Lunes'},{v:'sunday',l:'Domingo'}]}
+              value={calPrefs.weekStartsOn} onChange={v => saveCalPref({ weekStartsOn: v as any })} />
+          </SettingsRow>
+          <SettingsRow icon={<span style={{ fontSize:14 }}>🏖️</span>} iconBg="#5AC8FA" label="Mostrar fines de semana" sub="Sábado y domingo en la vista semanal" last>
             <Toggle value={calPrefs.showWeekends} onChange={v => saveCalPref({ showWeekends: v })} />
-          </div>
-        </SectionCard>
+          </SettingsRow>
+        </SettingsGroup>
 
-        <SectionCard>
-          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)' }}>Integraciones</p>
-          {[
-            { icon:'🗓️', name:'Google Calendar', sub:'Sincronizar eventos' },
-            { icon:'🍎', name:'Apple Calendar',  sub:'Importar/exportar' },
-          ].map(item=>(
-            <div key={item.name} className="settings-row">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">{item.icon}</span>
-                <div><p className="font-semibold text-sm">{item.name}</p><p className="text-xs" style={{ color:'var(--text-3)' }}>{item.sub}</p></div>
-              </div>
-              <button className="btn btn-secondary" style={{ padding:'7px 16px', fontSize:13 }}
-                onClick={() => toast('Próximamente')}>
-                Conectar
-              </button>
-            </div>
-          ))}
-          <button className="btn btn-ghost w-full mt-3" style={{ justifyContent:'center' }}
-            onClick={() => toast('Exportando .ics...')}>
-            <Download size={15} /> Exportar calendario (.ics)
-          </button>
-        </SectionCard>
+        <SettingsGroup label="Integraciones">
+          <SettingsRow icon={<span style={{ fontSize:16 }}>🗓️</span>} iconBg="#34C759" label="Google Calendar" sub="Sincronizar eventos" showArrow onClick={() => toast('Próximamente')} />
+          <SettingsRow icon={<span style={{ fontSize:16 }}>🍎</span>} iconBg="#636366" label="Apple Calendar" sub="Importar/exportar" showArrow onClick={() => toast('Próximamente')} last />
+        </SettingsGroup>
+
+        <button onClick={() => toast('Exportando .ics...')}
+          style={{ width:'100%',padding:'13px',borderRadius:12,border:'1px solid rgba(0,0,0,0.10)',background:'rgba(255,255,255,0.90)',color:'#007AFF',fontSize:14,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8,fontFamily:'var(--font-body)' }}>
+          <Download size={15} /> Exportar calendario (.ics)
+        </button>
       </div>
-    ),
+    )
 
-    // ── SECURITY ──
-    security: (
+    // ── SECURITY ───────────────────────────────────────────────────────────
+    case 'security': return (
       <div>
-        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>🔒 Seguridad</h1>
+        <SectionTitle>Seguridad</SectionTitle>
 
-        <SectionCard>
-          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)' }}>Cambiar contraseña</p>
-          <div className="flex flex-col gap-3">
-            <div className="relative">
-              <input type={showPw?'text':'password'} value={pwForm.current} onChange={e=>setPwForm(f=>({...f,current:e.target.value}))}
-                placeholder="Contraseña actual" className="input-apple" style={{ paddingRight:44 }} />
-              <button onClick={()=>setShowPw(v=>!v)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color:'var(--text-3)', background:'none', border:'none', cursor:'pointer' }}>
-                {showPw?<EyeOff size={16}/>:<Eye size={16}/>}
-              </button>
-            </div>
-            <input type="password" value={pwForm.next} onChange={e=>setPwForm(f=>({...f,next:e.target.value}))}
-              placeholder="Nueva contraseña" className="input-apple" />
-            <input type="password" value={pwForm.confirm} onChange={e=>setPwForm(f=>({...f,confirm:e.target.value}))}
-              placeholder="Confirmar nueva contraseña" className="input-apple" />
-            <button className="btn btn-primary" style={{ padding:'12px' }}
-              onClick={() => { if(pwForm.next===pwForm.confirm&&pwForm.next.length>=6){toast.success('Contraseña actualizada ✅');setPwForm({current:'',next:'',confirm:''})}else{toast.error('Las contraseñas no coinciden o son muy cortas')} }}>
-              Actualizar contraseña
-            </button>
-          </div>
-        </SectionCard>
-
-        <SectionCard>
-          <div className="settings-row">
-            <div>
-              <p className="font-bold text-sm">Autenticación 2 factores</p>
-              <p className="text-xs" style={{ color:'var(--text-3)' }}>Seguridad extra con autenticador</p>
-            </div>
-            <Toggle value={twoFAEnabled} onChange={v=>{setTwoFAEnabled(v);toast(v?'2FA activado 🔐':'2FA desactivado')}} />
-          </div>
-          <div className="settings-row">
-            <div>
-              <p className="font-bold text-sm">PIN parental</p>
-              <p className="text-xs" style={{ color:'var(--text-3)' }}>Los niños no pueden cambiar ajustes</p>
-            </div>
-            <button className="btn btn-secondary" style={{ padding:'7px 16px', fontSize:13 }}
-              onClick={() => toast('Próximamente')}>
-              Configurar
-            </button>
-          </div>
-        </SectionCard>
-
-        <SectionCard>
-          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)' }}>Sesiones activas</p>
-          {[
-            { device:'Chrome · Windows', time:'Ahora mismo', current:true },
-            { device:'Safari · iPhone', time:'Hace 2 horas', current:false },
-          ].map((s,i)=>(
-            <div key={i} className="flex items-center justify-between py-2.5 border-b last:border-0" style={{ borderColor:'var(--border)' }}>
-              <div>
-                <p className="font-semibold text-sm">{s.device}</p>
-                <p className="text-xs" style={{ color:s.current?'var(--green)':'var(--text-3)' }}>{s.time}</p>
+        <SettingsGroup label="Contraseña">
+          {[{l:'Contraseña actual',k:'current'},{l:'Nueva contraseña',k:'next'},{l:'Confirmar nueva',k:'confirm'}].map((f,i,arr)=>(
+            <SettingsRow key={f.k} icon={i===0?<span>🔑</span>:<span>🔒</span>} iconBg="#636366" label={f.l} last={i===arr.length-1}>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <input type={showPw?'text':'password'} value={(pwForm as any)[f.k]}
+                  onChange={e=>setPwForm(p=>({...p,[f.k]:e.target.value}))}
+                  placeholder="••••••••"
+                  style={{ border:'none',outline:'none',fontSize:14,color:'#8E8E93',textAlign:'right',background:'transparent',fontFamily:'var(--font-body)',width:120 }} />
+                {i===0&&<button onClick={()=>setShowPw(v=>!v)} style={{ border:'none',background:'transparent',cursor:'pointer',color:'#8E8E93' }}>{showPw?<EyeOff size={15}/>:<Eye size={15}/>}</button>}
               </div>
-              {!s.current && <button className="text-xs font-bold" style={{ color:'var(--red)' }} onClick={()=>toast('Sesión cerrada')}>Cerrar</button>}
-            </div>
+            </SettingsRow>
           ))}
-          <button className="btn btn-ghost w-full mt-3" style={{ color:'var(--red)', justifyContent:'center' }}
-            onClick={() => toast.error('Todas las sesiones cerradas')}>
-            <LogOut size={15} /> Cerrar todas las sesiones
-          </button>
-        </SectionCard>
+        </SettingsGroup>
 
-        <SectionCard>
-          <p className="font-bold text-sm mb-3" style={{ fontFamily:'var(--font-heading)', color:'var(--red)' }}>⚠️ Zona peligrosa</p>
-          <button className="btn btn-ghost w-full mb-3" style={{ justifyContent:'center' }}
-            onClick={() => { const d=JSON.stringify({}); const b=new Blob([d],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='familyquest-backup.json'; a.click() }}>
-            <Download size={15} /> Descargar mis datos
-          </button>
-          <div className="flex flex-col gap-2">
-            <p className="text-xs font-semibold" style={{ color:'var(--text-3)' }}>Escribe ELIMINAR para confirmar</p>
-            <input value={deleteConfirm} onChange={e=>setDeleteConfirm(e.target.value)}
-              placeholder='Escribe "ELIMINAR"' className="input-apple" style={{ borderColor: deleteConfirm==='ELIMINAR'?'var(--red)':'var(--border)' }} />
-            <button disabled={deleteConfirm!=='ELIMINAR'}
-              onClick={() => { if(deleteConfirm==='ELIMINAR'){localStorage.clear();window.location.reload()} }}
-              className="btn btn-danger w-full" style={{ padding:'12px', opacity:deleteConfirm==='ELIMINAR'?1:0.4 }}>
+        <motion.button whileTap={{scale:0.97}} onClick={()=>{
+          if(pwForm.next===pwForm.confirm&&pwForm.next.length>=6){toast.success('Contraseña actualizada ✅');setPwForm({current:'',next:'',confirm:''})}
+          else toast.error('Las contraseñas no coinciden o son muy cortas')
+        }} style={{ width:'100%',padding:'13px',borderRadius:12,border:'none',background:'linear-gradient(135deg,#636366,#48484A)',color:'#fff',fontSize:14,fontWeight:700,fontFamily:'var(--font-heading)',cursor:'pointer',marginBottom:20 }}>
+          Actualizar contraseña
+        </motion.button>
+
+        <SettingsGroup label="Seguridad adicional">
+          <SettingsRow icon={<span style={{ fontSize:14 }}>🔐</span>} iconBg="#FF3B30" label="Autenticación 2 factores" sub="Más seguridad con autenticador" last>
+            <Toggle value={twoFA} onChange={v=>{setTwoFA(v);saved()}} />
+          </SettingsRow>
+        </SettingsGroup>
+
+        <SettingsGroup label="Datos">
+          <SettingsRow icon={<Download size={15} color="#fff" />} iconBg="#007AFF" label="Descargar mis datos" showArrow onClick={()=>{const d=JSON.stringify({});const b=new Blob([d],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='familyquest-backup.json';a.click();toast.success('Descargando...')}} />
+          <SettingsRow icon={<LogOut size={15} color="#fff" />} iconBg="#FF3B30" label="Cerrar sesión en todos" showArrow last onClick={()=>toast.error('Todas las sesiones cerradas')} />
+        </SettingsGroup>
+
+        <SettingsGroup label="Zona peligrosa">
+          <div style={{ padding:'16px' }}>
+            <p style={{ fontSize:13,color:'#FF3B30',fontWeight:600,marginBottom:10 }}>
+              ⚠️ Escribe ELIMINAR para confirmar el borrado de cuenta
+            </p>
+            <input value={deleteWord} onChange={e=>setDeleteWord(e.target.value)} placeholder='Escribe "ELIMINAR"'
+              style={{ width:'100%',padding:'11px 14px',borderRadius:10,border:`1.5px solid ${deleteWord==='ELIMINAR'?'#FF3B30':'rgba(0,0,0,0.10)'}`,fontSize:14,fontFamily:'var(--font-body)',outline:'none',marginBottom:10,color:'#1C1C1E' }} />
+            <button disabled={deleteWord!=='ELIMINAR'}
+              onClick={()=>{if(deleteWord==='ELIMINAR'){localStorage.clear();window.location.reload()}}}
+              style={{ width:'100%',padding:'12px',borderRadius:10,border:'none',background:deleteWord==='ELIMINAR'?'#FF3B30':'rgba(0,0,0,0.06)',color:deleteWord==='ELIMINAR'?'#fff':'#C7C7CC',fontSize:14,fontWeight:700,cursor:deleteWord==='ELIMINAR'?'pointer':'default',fontFamily:'var(--font-heading)' }}>
               Eliminar cuenta permanentemente
             </button>
           </div>
-        </SectionCard>
+        </SettingsGroup>
       </div>
-    ),
+    )
 
-    // ── SUBSCRIPTION ──
-    subscription: (
+    // ── SUBSCRIPTION ───────────────────────────────────────────────────────
+    case 'subscription': return (
       <div>
-        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>💳 Plan</h1>
-        <SectionCard>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl" style={{ background:'rgba(245,158,11,0.1)' }}>⭐</div>
-            <div>
-              <p className="font-black text-lg" style={{ fontFamily:'var(--font-heading)' }}>Plan Free</p>
-              <p className="text-sm" style={{ color:'var(--text-3)' }}>5 miembros · 30 tasks/mes</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { name:'Free', price:'$0', features:['5 miembros','30 tasks/mes','1 semana historial'], color:'#64748B' },
-              { name:'Pro', price:'$4.99', features:['Ilimitado','Tasks sin límite','Historial completo','Sin anuncios'], color:'var(--blue)', highlight:true },
-              { name:'Family Pro', price:'$9.99', features:['Todo Pro','8 miembros','Múltiples familias','Soporte prioritario'], color:'#AF52DE' },
-            ].map(plan=>(
-              <div key={plan.name} className="card p-4 text-center"
-                style={{ border:`2px solid ${plan.highlight?plan.color:'var(--border)'}`, background:plan.highlight?`rgba(0,122,255,0.04)`:undefined }}>
-                <p className="font-black text-base mb-1" style={{ color:plan.color, fontFamily:'var(--font-heading)' }}>{plan.name}</p>
-                <p className="font-black text-2xl mb-3" style={{ fontFamily:'var(--font-heading)' }}>{plan.price}<span className="text-xs font-normal text-gray-400">/mes</span></p>
-                <ul className="text-xs text-left space-y-1 mb-4" style={{ color:'var(--text-2)' }}>
-                  {plan.features.map(f=><li key={f} className="flex items-center gap-1"><Check size={11} style={{ color:plan.color }}/>{f}</li>)}
-                </ul>
-                <button onClick={() => toast('Próximamente: Stripe Checkout')}
-                  className="btn w-full" style={{ background:plan.highlight?plan.color:'var(--bg)', color:plan.highlight?'#fff':'var(--text-2)', border:`1px solid ${plan.color}`, padding:'8px', fontSize:12, borderRadius:'var(--radius-md)' }}>
-                  {plan.highlight?'Upgrade':'Seleccionar'}
+        <SectionTitle>Plan</SectionTitle>
+
+        <div style={{ padding:'20px', borderRadius:18, background:'linear-gradient(135deg,#007AFF,#5856D6)', color:'#fff', marginBottom:20, boxShadow:'0 8px 24px rgba(0,122,255,0.35)' }}>
+          <p style={{ fontSize:12,fontWeight:600,opacity:0.7,textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:4 }}>Plan actual</p>
+          <p style={{ fontSize:26,fontWeight:900,fontFamily:'var(--font-heading)',marginBottom:4 }}>Free</p>
+          <p style={{ fontSize:13,opacity:0.8 }}>5 miembros · 30 tasks/mes</p>
+        </div>
+
+        <SettingsGroup label="Planes disponibles">
+          {[
+            { name:'Pro', price:'$4.99/mes', color:'#007AFF', features:['Miembros ilimitados','Tasks sin límite','Historial completo'] },
+            { name:'Family Pro', price:'$9.99/mes', color:'#AF52DE', features:['Todo en Pro','8 miembros','Soporte prioritario'] },
+          ].map((plan,i,arr)=>(
+            <div key={plan.name} style={{ padding:'16px', borderBottom: i<arr.length-1?'1px solid rgba(0,0,0,0.06)':'none' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+                <div>
+                  <p style={{ fontSize:16,fontWeight:800,color:plan.color,fontFamily:'var(--font-heading)' }}>{plan.name}</p>
+                  <p style={{ fontSize:13,color:'#8E8E93',marginTop:2 }}>{plan.price}</p>
+                </div>
+                <button onClick={()=>toast('Próximamente: Stripe Checkout')}
+                  style={{ padding:'8px 20px',borderRadius:99,border:`1.5px solid ${plan.color}`,background:`rgba(${plan.color==='#007AFF'?'0,122,255':'175,82,222'},0.10)`,color:plan.color,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-body)' }}>
+                  Upgrade
                 </button>
               </div>
-            ))}
-          </div>
-        </SectionCard>
-      </div>
-    ),
-
-    // ── ABOUT ──
-    about: (
-      <div>
-        <h1 className="font-black text-2xl mb-5" style={{ fontFamily:'var(--font-heading)' }}>ℹ️ Acerca de</h1>
-        <SectionCard>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center font-black text-2xl text-white"
-              style={{ background:'linear-gradient(135deg,#007AFF,#5856D6)', fontFamily:'var(--font-heading)' }}>FQ</div>
-            <div>
-              <p className="font-black text-lg" style={{ fontFamily:'var(--font-heading)' }}>FamilyQuest</p>
-              <p className="text-sm" style={{ color:'var(--text-3)' }}>Versión 1.0.0</p>
-            </div>
-          </div>
-          {[
-            { l:'Novedades', sub:'Ver qué hay de nuevo', icon:Smartphone },
-            { l:'Términos de uso', sub:'Leer los términos', icon:Link2 },
-            { l:'Política de privacidad', sub:'Cómo usamos tus datos', icon:Shield },
-            { l:'Contacto / Soporte', sub:'Escríbenos un email', icon:Hash },
-          ].map(item=>(
-            <div key={item.l} className="settings-row cursor-pointer" onClick={() => toast('Próximamente')}>
-              <div className="flex items-center gap-2">
-                <item.icon size={16} style={{ color:'var(--text-3)' }} />
-                <div><p className="font-semibold text-sm">{item.l}</p><p className="text-xs" style={{ color:'var(--text-3)' }}>{item.sub}</p></div>
+              <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+                {plan.features.map(f=>(
+                  <span key={f} style={{ fontSize:11,fontWeight:600,color:'#636366',background:'rgba(0,0,0,0.04)',padding:'3px 10px',borderRadius:99 }}>✓ {f}</span>
+                ))}
               </div>
-              <ChevronRight size={16} style={{ color:'var(--text-3)' }} />
             </div>
           ))}
-        </SectionCard>
-        <div className="text-center mt-4" style={{ color:'var(--text-3)' }}>
-          <p className="text-xs">Hecho con ❤️ para las familias</p>
-          <p className="text-xs mt-1">© 2026 FamilyQuest</p>
-        </div>
+        </SettingsGroup>
       </div>
-    ),
+    )
+
+    // ── ABOUT ──────────────────────────────────────────────────────────────
+    case 'about': return (
+      <div>
+        <SectionTitle>Acerca de</SectionTitle>
+
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'28px 0', marginBottom:20 }}>
+          <div style={{ width:80,height:80,borderRadius:20,background:'linear-gradient(135deg,#E07B8A,#D45C6B)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'var(--font-heading)',fontWeight:900,fontSize:28,color:'#fff',boxShadow:'0 6px 20px rgba(224,123,138,0.40)',marginBottom:14 }}>FQ</div>
+          <p style={{ fontSize:22,fontWeight:900,fontFamily:'var(--font-heading)',color:'#1C1C1E' }}>FamilyQuest</p>
+          <p style={{ fontSize:14,color:'#8E8E93',marginTop:4 }}>Versión 1.0.0</p>
+        </div>
+
+        <SettingsGroup>
+          {[
+            { l:'Términos de uso',        e:'📄', onClick:()=>toast('Próximamente') },
+            { l:'Política de privacidad', e:'🔏', onClick:()=>toast('Próximamente') },
+            { l:'Contacto / Soporte',     e:'💬', onClick:()=>toast('hola@familyquest.app') },
+            { l:'Calificar la app',       e:'⭐', onClick:()=>toast('¡Gracias!'), last:true },
+          ].map((item,i,arr)=>(
+            <SettingsRow key={item.l} icon={<span style={{ fontSize:16 }}>{item.e}</span>} iconBg="transparent"
+              label={item.l} showArrow onClick={item.onClick} last={i===arr.length-1} />
+          ))}
+        </SettingsGroup>
+
+        <p style={{ textAlign:'center',fontSize:12,color:'#C7C7CC',marginTop:20 }}>
+          Hecho con ❤️ para las familias · © 2026 FamilyQuest
+        </p>
+      </div>
+    )
+
+    default: return null
+    }
   }
 
+  // ── RENDER ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display:'flex', height:'100%', background:'var(--bg)', overflow:'hidden' }}>
-      {/* Left nav */}
-      <div style={{ width:220, background:'var(--surface)', borderRight:'1px solid var(--border)', padding:'20px 12px', display:'flex', flexDirection:'column', gap:2, flexShrink:0, overflowY:'auto' }}>
-        <p className="text-xs font-bold uppercase tracking-wider px-2 mb-3" style={{ color:'var(--text-3)' }}>Ajustes</p>
-        {NAV.map(item => (
-          <button key={item.id} onClick={() => setActive(item.id)}
-            className={`settings-nav-item ${active===item.id?'active':''}`}>
-            <span className="text-base">{item.emoji}</span>
-            {item.label}
-            {active===item.id && <ChevronRight size={14} className="ml-auto" style={{ color:'var(--blue)' }} />}
-          </button>
-        ))}
+    <div style={{ display:'flex', height:'100%', background:'#F2F2F7', overflow:'hidden', fontFamily:'var(--font-body)' }}>
+
+      {/* Sidebar */}
+      <div style={{ width:240, background:'#F2F2F7', borderRight:'1px solid rgba(0,0,0,0.06)', display:'flex', flexDirection:'column', overflow:'hidden', flexShrink:0 }}>
+        <div style={{ padding:'20px 16px 10px' }}>
+          <p style={{ fontSize:22, fontWeight:900, color:'#1C1C1E', fontFamily:'var(--font-heading)' }}>Ajustes</p>
+        </div>
+        <div style={{ flex:1, overflowY:'auto', padding:'0 10px 16px' }}>
+          {SECTIONS.map(s => (
+            <button key={s.id} onClick={() => setActive(s.id)}
+              style={{
+                width:'100%', display:'flex', alignItems:'center', gap:12,
+                padding:'10px 12px', borderRadius:12, border:'none',
+                background: active===s.id ? '#fff' : 'transparent',
+                cursor:'pointer', marginBottom:2,
+                boxShadow: active===s.id ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+                transition:'all 0.15s',
+              }}>
+              <div style={{ width:30, height:30, borderRadius:8, background:s.iconBg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>
+                {s.emoji}
+              </div>
+              <span style={{ fontSize:14, fontWeight: active===s.id ? 700 : 500, color: active===s.id ? '#1C1C1E' : '#3C3C43', fontFamily:'var(--font-body)', flex:1, textAlign:'left' }}>
+                {s.label}
+              </span>
+              {active===s.id && <ChevronRight size={14} color="#C7C7CC" />}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Content */}
       <div style={{ flex:1, overflowY:'auto', padding:'24px' }}>
         <AnimatePresence mode="wait">
           <motion.div key={active}
-            initial={{ opacity:0, x:12 }}
+            initial={{ opacity:0, x:10 }}
             animate={{ opacity:1, x:0 }}
-            exit={{ opacity:0, x:-12 }}
-            transition={{ duration:0.18, ease:'easeInOut' }}>
-            {sections[active]}
+            exit={{ opacity:0, x:-10 }}
+            transition={{ duration:0.16, ease:'easeInOut' }}
+          >
+            {renderSection()}
           </motion.div>
         </AnimatePresence>
       </div>
     </div>
   )
+}
+
+// ─── Small helpers ────────────────────────────────────────────────────────
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h1 style={{ fontSize:26, fontWeight:900, color:'#1C1C1E', fontFamily:'var(--font-heading)', marginBottom:20 }}>{children}</h1>
 }

@@ -19,6 +19,10 @@ export interface AppSettings {
   theme: 'light' | 'dark' | 'system'
   notifications: boolean
   members: AppMember[]
+  // Extended settings
+  language: 'es' | 'en' | 'fr'
+  fontSize: 'small' | 'normal' | 'large' | 'xlarge'
+  accentColor: string
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -34,4 +38,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     { id: 'wei',   name: 'Wei',   avatar: '👨', bgColor: '#E0F2FE', textColor: '#075985', barColor: '#38BDF8', role: 'adult'  },
     { id: 'julie', name: 'Julie', avatar: '👧', bgColor: '#F3E8FF', textColor: '#6B21A8', barColor: '#C084FC', role: 'child'  },
   ],
+  language: 'es',
+  fontSize: 'normal',
+  accentColor: '#007AFF',
 }
