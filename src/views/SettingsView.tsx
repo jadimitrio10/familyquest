@@ -199,18 +199,18 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
               <Camera size={13} />
             </button>
           </div>
-          <p style={{ fontSize:18, fontWeight:700, color:'#1C1C1E', fontFamily:'var(--font-heading)' }}>{profileName || 'Tu nombre'}</p>
-          <p style={{ fontSize:13, color:'#8E8E93' }}>Administrador</p>
+          <p style={{ fontSize:18, fontWeight:700, color:'#1C1C1E', fontFamily:'var(--font-heading)' }}>{profileName || t('settings.name')}</p>
+          <p style={{ fontSize:13, color:'#8E8E93' }}>{t('settings.administrator')}</p>
         </div>
 
         <SettingsGroup label={t('settings.profile')}>
           <SettingsRow icon={<User size={16} color="#fff" />} iconBg="#007AFF" label={t('settings.name')}>
             <input value={profileName} onChange={e => setProfileName(e.target.value)}
               onBlur={() => { onUpdate({ familyName: profileName }); saved() }}
-              placeholder="Tu nombre"
+              placeholder={t('settings.name')}
               style={{ border:'none', outline:'none', fontSize:14, color:'#8E8E93', textAlign:'right', background:'transparent', fontFamily:'var(--font-body)', width:160 }} />
           </SettingsRow>
-          <SettingsRow icon={<span style={{ fontSize:14 }}>📱</span>} iconBg="#34C759" label="Teléfono" last>
+          <SettingsRow icon={<span style={{ fontSize:14 }}>📱</span>} iconBg="#34C759" label={t('settings.phone')} last>
             <input value={profilePhone} onChange={e => setProfilePhone(e.target.value)}
               onBlur={() => { onUpdate({ phone: profilePhone } as any); saved() }}
               placeholder="+1 (305) 000-0000"
@@ -218,8 +218,8 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
           </SettingsRow>
         </SettingsGroup>
 
-        <SettingsGroup label="Preferencias">
-          <SettingsRow icon={<span style={{ fontSize:14 }}>🌐</span>} iconBg="#5AC8FA" label="Idioma" value={settings.language === 'en' ? 'English' : settings.language === 'fr' ? 'Français' : 'Español'}>
+        <SettingsGroup label={t('settings.preferences')}>
+          <SettingsRow icon={<span style={{ fontSize:14 }}>🌐</span>} iconBg="#5AC8FA" label={t('settings.language')} value={settings.language === 'en' ? 'English' : settings.language === 'fr' ? 'Français' : 'Español'}>
             <select value={settings.language || 'es'} onChange={e => savePref('language', e.target.value as any)}
               style={{ border:'none', outline:'none', fontSize:14, color:'#007AFF', background:'transparent', cursor:'pointer', fontFamily:'var(--font-body)', fontWeight:600 }}>
               <option value="es">Español</option>
@@ -227,12 +227,12 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
               <option value="fr">Français</option>
             </select>
           </SettingsRow>
-          <SettingsRow icon={<span style={{ fontSize:14 }}>🌡️</span>} iconBg="#FF9500" label="Temperatura">
+          <SettingsRow icon={<span style={{ fontSize:14 }}>🌡️</span>} iconBg="#FF9500" label={t('settings.temperature')}>
             <PillSelect options={[{v:'F',l:'°F'},{v:'C',l:'°C'}]}
               value={settings.temperatureUnit || 'F'}
               onChange={v => savePref('temperatureUnit', v as any)} />
           </SettingsRow>
-          <SettingsRow icon={<span style={{ fontSize:14 }}>🕐</span>} iconBg="#AF52DE" label="Hora" last>
+          <SettingsRow icon={<span style={{ fontSize:14 }}>🕐</span>} iconBg="#AF52DE" label={t('settings.timeFormat')} last>
             <PillSelect options={[{v:'12h',l:'12h'},{v:'24h',l:'24h'}]}
               value={settings.timeFormat || '12h'}
               onChange={v => savePref('timeFormat', v as any)} />
@@ -241,7 +241,7 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
 
         <motion.button whileTap={{ scale:0.97 }} onClick={() => { onUpdate({ familyName: profileName, phone: profilePhone } as any); saved() }}
           style={{ width:'100%', padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#007AFF,#0063CC)', color:'#fff', fontSize:15, fontWeight:700, fontFamily:'var(--font-heading)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, boxShadow:'0 4px 14px rgba(0,122,255,0.30)' }}>
-          <Save size={16} /> Guardar perfil
+          <Save size={16} /> {t('settings.saveProfile')}
         </motion.button>
       </div>
     )
@@ -252,32 +252,32 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
         <SectionTitle>Familia</SectionTitle>
 
         {/* ── CLOUD SYNC — simple button, opens isolated modal ── */}
-        <SettingsGroup label="📱 Sincronizar en todos tus dispositivos">
+        <SettingsGroup label={t('settings.syncGroup')}>
           <div style={{ padding: 16 }}>
             {cloudConnected ? (
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
                 <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                   <span style={{ fontSize:24 }}>☁️</span>
                   <div>
-                    <p style={{ fontSize:14, fontWeight:800, color:'#34C759', fontFamily:'var(--font-heading)' }}>✅ Conectado a la nube</p>
+                    <p style={{ fontSize:14, fontWeight:800, color:'#34C759', fontFamily:'var(--font-heading)' }}>{t('settings.syncConnected')}</p>
                     <p style={{ fontSize:12, color:'#8E8E93', marginTop:2 }}>
-                      Código: <strong style={{ color:'#007AFF', fontFamily:'monospace', letterSpacing:'0.1em' }}>{cloudCode}</strong>
+                      Code: <strong style={{ color:'#007AFF', fontFamily:'monospace', letterSpacing:'0.1em' }}>{cloudCode}</strong>
                     </p>
                   </div>
                 </div>
                 <button onClick={() => setShowCloudModal(true)}
                   style={{ padding:'8px 16px', borderRadius:12, border:'none', background:'rgba(52,199,89,0.12)', color:'#34C759', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)', flexShrink:0 }}>
-                  Gestionar
+                  {t('settings.syncManage')}
                 </button>
               </div>
             ) : (
               <div>
                 <p style={{ fontSize:14, color:'#3C3C43', marginBottom:14, lineHeight:1.5 }}>
-                  Conecta para que el <strong>iPad</strong>, teléfono y PC compartan los mismos datos.
+                  {t('settings.syncDesc')}
                 </p>
                 <motion.button whileTap={{ scale:0.97 }} onClick={() => setShowCloudModal(true)}
                   style={{ width:'100%', padding:'15px', borderRadius:16, border:'none', background:'linear-gradient(135deg,#34C759,#28A745)', color:'#fff', fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'var(--font-heading)', boxShadow:'0 4px 16px rgba(52,199,89,0.35)', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-                  ☁️ Conectar mis dispositivos
+                  {t('settings.syncConnect')}
                 </motion.button>
               </div>
             )}
@@ -293,8 +293,8 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
         )}
 
         {/* Invite code */}
-        <SettingsGroup label="Código de invitación">
-          <SettingsRow label="Código" sub="Compártelo para que otros se unan" icon={<span style={{ fontSize:14 }}>🔗</span>} iconBg="#FF9500" last>
+        <SettingsGroup label={t('settings.inviteCode')}>
+          <SettingsRow label={t('settings.inviteCode')} sub={t('settings.inviteSub')} icon={<span style={{ fontSize:14 }}>🔗</span>} iconBg="#FF9500" last>
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
               <span style={{ fontSize:15, fontWeight:800, color:'#007AFF', fontFamily:'monospace', letterSpacing:'0.1em', background:'rgba(0,122,255,0.08)', padding:'4px 10px', borderRadius:8 }}>
                 {settings.familyName?.slice(0,8).toUpperCase() || 'FAMQUEST'}
@@ -312,7 +312,7 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
         </SettingsGroup>
 
         {/* Members */}
-        <SettingsGroup label={`Miembros (${members.length})`}>
+        <SettingsGroup label={`${t('settings.members')} (${members.length})`}>
           {members.map((m, idx) => (
             <div key={m.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderBottom: idx < members.length-1 ? '1px solid rgba(0,0,0,0.06)' : 'none' }}>
               <div style={{ position:'relative' }}>
@@ -379,8 +379,9 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
           {/* Add member button */}
           <div style={{ padding:'0 16px 4px' }}>
             <button onClick={() => setShowAddMember(true)}
-              style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px dashed rgba(0,122,255,0.3)', background:'rgba(0,122,255,0.04)', color:'#007AFF', fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:'var(--font-body)', marginTop:8, marginBottom:4 }}>
-              <Plus size={16} /> Agregar miembro
+              style={{ width:'100%', padding:'12px', borderRadius:12, border:'1.5px dashed rgba(0,122,255,0.3)', background:'rgba(0,122,255,0.04)', color:'#007AFF', fontSize:14, fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, fontFamily:'var(--font-body)', marginTop:8, marginBottom:4 }}
+            >
+              <Plus size={16} /> {t('settings.addMember')}
             </button>
           </div>
         </SettingsGroup>
@@ -395,7 +396,7 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
                 transition={{type:'spring',stiffness:340,damping:30}}
                 style={{ width:'100%',maxWidth:480,background:'rgba(255,251,247,0.98)',backdropFilter:'blur(40px)',borderRadius:'28px 28px 0 0',padding:'12px 24px 32px',boxShadow:'0 -4px 40px rgba(0,0,0,0.12)' }}>
                 <div style={{ width:36,height:4,borderRadius:99,background:'rgba(0,0,0,0.12)',margin:'0 auto 18px' }} />
-                <h2 style={{ fontSize:20,fontWeight:900,fontFamily:'var(--font-heading)',marginBottom:18 }}>Agregar miembro</h2>
+                <h2 style={{ fontSize:20,fontWeight:900,fontFamily:'var(--font-heading)',marginBottom:18 }}>{t('settings.addMemberTitle')}</h2>
                 <div style={{ display:'flex',gap:10,alignItems:'center',marginBottom:14 }}>
                   <div style={{ position:'relative' }}>
                     <button onClick={()=>setShowEmojiFor('new')}
@@ -410,11 +411,11 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
                       )}
                     </AnimatePresence>
                   </div>
-                  <input value={newMember.name} onChange={e=>setNewMember(f=>({...f,name:e.target.value}))} placeholder="Nombre" autoFocus
+                  <input value={newMember.name} onChange={e=>setNewMember(f=>({...f,name:e.target.value}))} placeholder={t('settings.name')} autoFocus
                     style={{ flex:1,padding:'13px 16px',borderRadius:12,border:'1.5px solid rgba(0,0,0,0.10)',fontSize:15,fontFamily:'var(--font-body)',outline:'none',background:'rgba(255,255,255,0.90)' }} />
                 </div>
                 <div style={{ display:'flex',gap:8,marginBottom:14 }}>
-                  {[{v:'adult',l:'👨 Adulto'},{v:'child',l:'👦 Niño/a'}].map(opt=>(
+                  {[{v:'adult',l:`👨 ${t('common.adult')}`},{v:'child',l:`👦 ${t('common.child')}`}].map(opt=>(
                     <button key={opt.v} onClick={()=>setNewMember(f=>({...f,role:opt.v as any}))}
                       style={{ flex:1,padding:'10px',borderRadius:12,border:`1.5px solid ${newMember.role===opt.v?'#007AFF':'rgba(0,0,0,0.10)'}`,background:newMember.role===opt.v?'rgba(0,122,255,0.08)':'rgba(255,255,255,0.90)',color:newMember.role===opt.v?'#007AFF':'#3C3C43',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-body)' }}>
                       {opt.l}
@@ -434,7 +435,7 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
                   setNewMember({name:'',emoji:'👤',colorIdx:0,role:'child'})
                   setShowAddMember(false); saved()
                 }} style={{ width:'100%',padding:'14px',borderRadius:14,border:'none',background:'linear-gradient(135deg,#007AFF,#0063CC)',color:'#fff',fontSize:15,fontWeight:700,fontFamily:'var(--font-heading)',cursor:'pointer',boxShadow:'0 4px 14px rgba(0,122,255,0.30)' }}>
-                  Agregar
+                  {t('common.add')}
                 </motion.button>
               </motion.div>
             </motion.div>
@@ -446,23 +447,24 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
     // ── APPEARANCE ─────────────────────────────────────────────────────────
     case 'appearance': return (
       <div>
-        <SectionTitle>Apariencia</SectionTitle>
+        <SectionTitle>{t('settings.appearance')}</SectionTitle>
 
-        <SettingsGroup label="Modo de color">
-          <SettingsRow icon={<span style={{ fontSize:14 }}>☀️</span>} iconBg="#FF9500" label="Modo" last>
-            <PillSelect options={[{v:'light',l:'Claro'},{v:'dark',l:'Oscuro'},{v:'system',l:'Auto'}]}
+        <SettingsGroup label={t('settings.colorMode')}>
+          <SettingsRow icon={<span style={{ fontSize:14 }}>☀️</span>} iconBg="#FF9500" label={t('settings.colorModeRow')} last>
+            <PillSelect
+              options={[{v:'light',l:t('settings.light')},{v:'dark',l:t('settings.dark')},{v:'system',l:t('settings.auto')}]}
               value={settings.theme || 'light'} onChange={v => savePref('theme', v as any)} />
           </SettingsRow>
         </SettingsGroup>
 
-        <SettingsGroup label="Fuente">
-          <SettingsRow icon={<span style={{ fontSize:14 }}>Aa</span>} iconBg="#AF52DE" label="Tamaño de letra" last>
+        <SettingsGroup label={t('settings.fontGroup')}>
+          <SettingsRow icon={<span style={{ fontSize:14 }}>Aa</span>} iconBg="#AF52DE" label={t('settings.fontSizeLabel')} last>
             <PillSelect options={[{v:'small',l:'S'},{v:'normal',l:'M'},{v:'large',l:'L'},{v:'xlarge',l:'XL'}]}
               value={settings.fontSize as string || 'normal'} onChange={v => savePref('fontSize' as any, v)} />
           </SettingsRow>
         </SettingsGroup>
 
-        <SettingsGroup label="Color de acento">
+        <SettingsGroup label={t('settings.accentColor')}>
           <div style={{ padding:'16px' }}>
             <div style={{ display:'flex', gap:12, flexWrap:'wrap', justifyContent:'center' }}>
               {['#007AFF','#34C759','#FF3B30','#FF9500','#AF52DE','#5856D6','#FF2D55','#00C7BE','#FFCC00','#FF6B00'].map(c=>(
@@ -478,24 +480,24 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
     // ── NOTIFICATIONS ──────────────────────────────────────────────────────
     case 'notifications': return (
       <div>
-        <SectionTitle>Notificaciones</SectionTitle>
+        <SectionTitle>{t('settings.notifications')}</SectionTitle>
 
         <SettingsGroup>
-          <SettingsRow icon={<Bell size={16} color="#fff" />} iconBg="#FF3B30" label="Notificaciones" sub="Activar o desactivar todas" last>
+          <SettingsRow icon={<Bell size={16} color="#fff" />} iconBg="#FF3B30" label={t('settings.notifAll')} sub={t('settings.notifAllSub')} last>
             <Toggle value={notifMaster} onChange={v => { setNotifMaster(v); savePref('notifications', v) }} />
           </SettingsRow>
         </SettingsGroup>
 
-        <SettingsGroup label="Por tipo">
+        <SettingsGroup label={t('settings.notifByType')}>
           {([
-            { k:'notifTaskReminder' as const, l:'Recordatorio de task',   s:'Antes de que venza',       bg:'#FF9500' },
-            { k:'notifTaskDone'     as const, l:'Task completado',        s:'Cuando un hijo termina',   bg:'#34C759' },
-            { k:'notifNewEvent'     as const, l:'Nuevo evento',           s:'Eventos en el calendario', bg:'#007AFF' },
-            { k:'notifAchievement'  as const, l:'Logro desbloqueado',     s:'¡Felicidades!',            bg:'#FFCC00' },
-            { k:'notifReward'       as const, l:'Premio reclamado',       s:'Solicitudes de recompensa',bg:'#AF52DE' },
+            { k:'notifTaskReminder' as const, lk:'settings.taskReminder',    sk:'settings.taskReminderSub', bg:'#FF9500' },
+            { k:'notifTaskDone'     as const, lk:'settings.taskDoneNotif',   sk:'settings.taskDoneSub',     bg:'#34C759' },
+            { k:'notifNewEvent'     as const, lk:'settings.newEventNotif',   sk:'settings.newEventSub',     bg:'#007AFF' },
+            { k:'notifAchievement'  as const, lk:'settings.achievementNotif',sk:'settings.achievementSub',  bg:'#FFCC00' },
+            { k:'notifReward'       as const, lk:'settings.rewardNotif',     sk:'settings.rewardSub',       bg:'#AF52DE' },
           ] as const).map((item, i, arr) => (
             <SettingsRow key={item.k} icon={<Bell size={14} color="#fff" />} iconBg={item.bg}
-              label={item.l} sub={item.s} last={i===arr.length-1}>
+              label={t(item.lk)} sub={t(item.sk)} last={i===arr.length-1}>
               <Toggle size="sm"
                 value={(settings as any)[item.k] !== false}
                 disabled={!notifMaster}
@@ -504,19 +506,19 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
           ))}
         </SettingsGroup>
 
-        <SettingsGroup label="Horas de silencio">
-          <SettingsRow icon={<span style={{ fontSize:14 }}>🌙</span>} iconBg="#636366" label="Silenciar notificaciones">
+        <SettingsGroup label={t('settings.silentGroup')}>
+          <SettingsRow icon={<span style={{ fontSize:14 }}>🌙</span>} iconBg="#636366" label={t('settings.silentToggle')}>
             <Toggle value={(settings as any).silentHours || false}
               onChange={v => savePref('silentHours' as any, v as any)} />
           </SettingsRow>
           {(settings as any).silentHours && (
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, padding:'0 16px 14px' }}>
               {([
-                { l:'Desde', k:'silentFrom' as const, def:'22:00' },
-                { l:'Hasta', k:'silentTo'   as const, def:'07:00' },
+                { lk:'settings.silentFrom', k:'silentFrom' as const, def:'22:00' },
+                { lk:'settings.silentTo',   k:'silentTo'   as const, def:'07:00' },
               ] as const).map(f=>(
                 <div key={f.k}>
-                  <p style={{ fontSize:11,fontWeight:600,color:'#8E8E93',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.05em' }}>{f.l}</p>
+                  <p style={{ fontSize:11,fontWeight:600,color:'#8E8E93',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.05em' }}>{t(f.lk)}</p>
                   <input type="time"
                     value={(settings as any)[f.k] || f.def}
                     onChange={e => savePref(f.k as any, e.target.value as any)}
@@ -532,21 +534,26 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
     // ── GAMIFICATION ───────────────────────────────────────────────────────
     case 'gamification': return (
       <div>
-        <SectionTitle>Gamificación</SectionTitle>
+        <SectionTitle>{t('settings.gamification')}</SectionTitle>
         <SettingsGroup>
-          <SettingsRow icon={<span style={{ fontSize:14 }}>⭐</span>} iconBg="#FFCC00" label="Sistema de puntos" sub="Los hijos ganan puntos al completar tasks">
+          <SettingsRow icon={<span style={{ fontSize:14 }}>⭐</span>} iconBg="#FFCC00" label={t('settings.pointsSystem')} sub={t('settings.pointsSub')}>
             <Toggle value={(settings as any).pointsEnabled !== false}
               onChange={v => savePref('pointsEnabled' as any, v as any)} />
           </SettingsRow>
-          <SettingsRow icon={<span style={{ fontSize:14 }}>🔥</span>} iconBg="#FF9500" label="Rachas" sub="Días consecutivos completando tasks" last>
+          <SettingsRow icon={<span style={{ fontSize:14 }}>🔥</span>} iconBg="#FF9500" label={t('settings.streaks')} sub={t('settings.streaksSub')} last>
             <Toggle value={(settings as any).streaksEnabled !== false}
               onChange={v => savePref('streaksEnabled' as any, v as any)} />
           </SettingsRow>
         </SettingsGroup>
 
-        <SettingsGroup label="Logros disponibles">
-          {[{e:'🌟',t:'Primera Tarea',d:'Completar el primer task'},{e:'🔥',t:'Racha de 7 días',d:'7 días consecutivos'},{e:'💯',t:'Perfeccionista',d:'100 tasks completados'},{e:'👑',t:'Campeón',d:'1000 puntos acumulados'}].map((a,i,arr)=>(
-            <SettingsRow key={a.t} icon={<span style={{ fontSize:16 }}>{a.e}</span>} iconBg="transparent" label={a.t} sub={a.d} last={i===arr.length-1} />
+        <SettingsGroup label={t('settings.achievementsGroup')}>
+          {[
+            {e:'🌟', title:'First Task',    desc:'Complete the first task'},
+            {e:'🔥', title:'7-day streak',  desc:'7 consecutive days'},
+            {e:'💯', title:'Perfectionist', desc:'100 tasks completed'},
+            {e:'👑', title:'Champion',      desc:'1000 points accumulated'},
+          ].map((a,i,arr)=>(
+            <SettingsRow key={a.title} icon={<span style={{ fontSize:16 }}>{a.e}</span>} iconBg="transparent" label={a.title} sub={a.desc} last={i===arr.length-1} />
           ))}
         </SettingsGroup>
       </div>
@@ -555,42 +562,41 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
     // ── CALENDAR ───────────────────────────────────────────────────────────
     case 'calendar': return (
       <div>
-        <SectionTitle>Calendario</SectionTitle>
+        <SectionTitle>{t('settings.calendar')}</SectionTitle>
 
         <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', borderRadius:12, background:'rgba(0,122,255,0.08)', border:'1px solid rgba(0,122,255,0.20)', marginBottom:20 }}>
           <span style={{ fontSize:18 }}>✨</span>
-          <p style={{ fontSize:13, fontWeight:600, color:'#007AFF', fontFamily:'var(--font-body)' }}>Cambios instantáneos — sin botón de guardar</p>
+          <p style={{ fontSize:13, fontWeight:600, color:'#007AFF', fontFamily:'var(--font-body)' }}>{t('settings.autoSave')}</p>
         </div>
 
-        <SettingsGroup label="Vista">
-          <SettingsRow icon={<CalendarDays size={16} color="#fff" />} iconBg="#34C759" label="Vista por defecto"
-            value={calPrefs.defaultView==='week'?'Semana':calPrefs.defaultView==='day'?'Día':calPrefs.defaultView==='month'?'Mes':'Agenda'} last>
-            <PillSelect options={[{v:'week',l:'Semana'},{v:'day',l:'Día'},{v:'month',l:'Mes'},{v:'agenda',l:'Agenda'}]}
+        <SettingsGroup label={t('settings.defaultView')}>
+          <SettingsRow icon={<CalendarDays size={16} color="#fff" />} iconBg="#34C759" label={t('settings.defaultView')} last>
+            <PillSelect options={[{v:'week',l:'Week'},{v:'day',l:'Day'},{v:'month',l:'Month'},{v:'agenda',l:'Agenda'}]}
               value={calPrefs.defaultView} onChange={v => saveCalPref({ defaultView: v as any })} />
           </SettingsRow>
         </SettingsGroup>
 
-        <SettingsGroup label="Opciones">
-          <SettingsRow icon={<span style={{ fontSize:14 }}>📋</span>} iconBg="#007AFF" label="Mostrar tasks" sub="Tasks con hora en su slot">
+        <SettingsGroup label="Options">
+          <SettingsRow icon={<span style={{ fontSize:14 }}>📋</span>} iconBg="#007AFF" label={t('settings.showTasks')} sub={t('settings.showTasksSub')}>
             <Toggle value={calPrefs.showTasks} onChange={v => saveCalPref({ showTasks: v })} />
           </SettingsRow>
-          <SettingsRow icon={<span style={{ fontSize:14 }}>📅</span>} iconBg="#FF9500" label="La semana empieza en">
-            <PillSelect options={[{v:'monday',l:'Lunes'},{v:'sunday',l:'Domingo'}]}
+          <SettingsRow icon={<span style={{ fontSize:14 }}>📅</span>} iconBg="#FF9500" label={t('settings.weekStarts')}>
+            <PillSelect options={[{v:'monday',l:t('common.monday')},{v:'sunday',l:t('common.sunday')}]}
               value={calPrefs.weekStartsOn} onChange={v => saveCalPref({ weekStartsOn: v as any })} />
           </SettingsRow>
-          <SettingsRow icon={<span style={{ fontSize:14 }}>🏖️</span>} iconBg="#5AC8FA" label="Mostrar fines de semana" sub="Sábado y domingo en la vista semanal" last>
+          <SettingsRow icon={<span style={{ fontSize:14 }}>🏖️</span>} iconBg="#5AC8FA" label={t('settings.showWeekends')} sub={t('settings.showWeekendsSub')} last>
             <Toggle value={calPrefs.showWeekends} onChange={v => saveCalPref({ showWeekends: v })} />
           </SettingsRow>
         </SettingsGroup>
 
-        <SettingsGroup label="Integraciones">
-          <SettingsRow icon={<span style={{ fontSize:16 }}>🗓️</span>} iconBg="#34C759" label="Google Calendar" sub="Sincronizar eventos" showArrow onClick={() => toast('Próximamente')} />
-          <SettingsRow icon={<span style={{ fontSize:16 }}>🍎</span>} iconBg="#636366" label="Apple Calendar" sub="Importar/exportar" showArrow onClick={() => toast('Próximamente')} last />
+        <SettingsGroup label={t('settings.integrations')}>
+          <SettingsRow icon={<span style={{ fontSize:16 }}>🗓️</span>} iconBg="#34C759" label={t('settings.googleCal')} sub={t('settings.googleCalSub')} showArrow onClick={() => toast(t('common.soon'))} />
+          <SettingsRow icon={<span style={{ fontSize:16 }}>🍎</span>} iconBg="#636366" label={t('settings.appleCal')} sub={t('settings.appleCalSub')} showArrow onClick={() => toast(t('common.soon'))} last />
         </SettingsGroup>
 
-        <button onClick={() => toast('Exportando .ics...')}
+        <button onClick={() => toast(t('settings.exportIcs'))}
           style={{ width:'100%',padding:'13px',borderRadius:12,border:'1px solid rgba(0,0,0,0.10)',background:'rgba(255,255,255,0.90)',color:'#007AFF',fontSize:14,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:8,fontFamily:'var(--font-body)' }}>
-          <Download size={15} /> Exportar calendario (.ics)
+          <Download size={15} /> {t('settings.exportIcs')}
         </button>
       </div>
     )
@@ -598,11 +604,11 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
     // ── SECURITY ───────────────────────────────────────────────────────────
     case 'security': return (
       <div>
-        <SectionTitle>Seguridad</SectionTitle>
+        <SectionTitle>{t('settings.security')}</SectionTitle>
 
-        <SettingsGroup label="Contraseña">
-          {[{l:'Contraseña actual',k:'current'},{l:'Nueva contraseña',k:'next'},{l:'Confirmar nueva',k:'confirm'}].map((f,i,arr)=>(
-            <SettingsRow key={f.k} icon={i===0?<span>🔑</span>:<span>🔒</span>} iconBg="#636366" label={f.l} last={i===arr.length-1}>
+        <SettingsGroup label={t('settings.passwordGroup')}>
+          {[{lk:'settings.currentPw',k:'current'},{lk:'settings.newPw',k:'next'},{lk:'settings.confirmPw',k:'confirm'}].map((f,i,arr)=>(
+            <SettingsRow key={f.k} icon={i===0?<span>🔑</span>:<span>🔒</span>} iconBg="#636366" label={t(f.lk)} last={i===arr.length-1}>
               <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                 <input type={showPw?'text':'password'} value={(pwForm as any)[f.k]}
                   onChange={e=>setPwForm(p=>({...p,[f.k]:e.target.value}))}
@@ -615,42 +621,42 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
         </SettingsGroup>
 
         <motion.button whileTap={{scale:0.97}} onClick={()=>{
-          if(pwForm.next===pwForm.confirm&&pwForm.next.length>=6){toast.success('Contraseña actualizada ✅');setPwForm({current:'',next:'',confirm:''})}
-          else toast.error('Las contraseñas no coinciden o son muy cortas')
+          if(pwForm.next===pwForm.confirm&&pwForm.next.length>=6){toast.success(t('settings.pwMatch'));setPwForm({current:'',next:'',confirm:''})}
+          else toast.error(t('settings.pwNoMatch'))
         }} style={{ width:'100%',padding:'13px',borderRadius:12,border:'none',background:'linear-gradient(135deg,#636366,#48484A)',color:'#fff',fontSize:14,fontWeight:700,fontFamily:'var(--font-heading)',cursor:'pointer',marginBottom:20 }}>
-          Actualizar contraseña
+          {t('settings.updatePw')}
         </motion.button>
 
-        <SettingsGroup label="Seguridad adicional">
-          <SettingsRow icon={<span style={{ fontSize:14 }}>🔐</span>} iconBg="#FF3B30" label="Autenticación 2 factores" sub="Más seguridad con autenticador" last>
+        <SettingsGroup label={t('settings.additionalSec')}>
+          <SettingsRow icon={<span style={{ fontSize:14 }}>🔐</span>} iconBg="#FF3B30" label={t('settings.twoFA')} sub={t('settings.twoFASub')} last>
             <Toggle value={(settings as any).twoFAEnabled || false}
               onChange={v => savePref('twoFAEnabled' as any, v as any)} />
           </SettingsRow>
         </SettingsGroup>
 
-        <SettingsGroup label="Datos">
-          <SettingsRow icon={<Download size={15} color="#fff" />} iconBg="#007AFF" label="Descargar mis datos" showArrow onClick={()=>{
+        <SettingsGroup label={t('settings.dataGroup')}>
+          <SettingsRow icon={<Download size={15} color="#fff" />} iconBg="#007AFF" label={t('settings.downloadData')} showArrow onClick={()=>{
             const keys = ['fq_settings','fq_members_v2','fq_tasks_v2','fq_task_completions','fq_events_v3','fq_family_events_v1','fq_points_v1','fq_points_history_v1','fq_rewards_v1','fq_calendar_prefs_v1']
             const backup: Record<string,unknown> = { exportedAt: new Date().toISOString() }
             keys.forEach(k => { try { backup[k] = JSON.parse(localStorage.getItem(k)||'null') } catch { backup[k] = null } })
             const b=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'})
             const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`familyquest-backup-${new Date().toISOString().slice(0,10)}.json`;a.click()
-            toast.success('Backup descargado ✅')
+            toast.success('Backup ✅')
           }} />
-          <SettingsRow icon={<LogOut size={15} color="#fff" />} iconBg="#FF3B30" label="Cerrar sesión en todos" showArrow last onClick={()=>toast.error('Todas las sesiones cerradas')} />
+          <SettingsRow icon={<LogOut size={15} color="#fff" />} iconBg="#FF3B30" label={t('settings.logoutAll')} showArrow last onClick={()=>toast.error(t('settings.logoutAll'))} />
         </SettingsGroup>
 
-        <SettingsGroup label="Zona peligrosa">
+        <SettingsGroup label={t('settings.dangerZone')}>
           <div style={{ padding:'16px' }}>
             <p style={{ fontSize:13,color:'#FF3B30',fontWeight:600,marginBottom:10 }}>
-              ⚠️ Escribe ELIMINAR para confirmar el borrado de cuenta
+              {t('settings.deleteConfirm')}
             </p>
-            <input value={deleteWord} onChange={e=>setDeleteWord(e.target.value)} placeholder='Escribe "ELIMINAR"'
-              style={{ width:'100%',padding:'11px 14px',borderRadius:10,border:`1.5px solid ${deleteWord==='ELIMINAR'?'#FF3B30':'rgba(0,0,0,0.10)'}`,fontSize:14,fontFamily:'var(--font-body)',outline:'none',marginBottom:10,color:'#1C1C1E' }} />
-            <button disabled={deleteWord!=='ELIMINAR'}
-              onClick={()=>{if(deleteWord==='ELIMINAR'){localStorage.clear();window.location.reload()}}}
-              style={{ width:'100%',padding:'12px',borderRadius:10,border:'none',background:deleteWord==='ELIMINAR'?'#FF3B30':'rgba(0,0,0,0.06)',color:deleteWord==='ELIMINAR'?'#fff':'#C7C7CC',fontSize:14,fontWeight:700,cursor:deleteWord==='ELIMINAR'?'pointer':'default',fontFamily:'var(--font-heading)' }}>
-              Eliminar cuenta permanentemente
+            <input value={deleteWord} onChange={e=>setDeleteWord(e.target.value)} placeholder={t('settings.deleteWordPlaceholder')}
+              style={{ width:'100%',padding:'11px 14px',borderRadius:10,border:`1.5px solid ${deleteWord===t('settings.deleteWord')?'#FF3B30':'rgba(0,0,0,0.10)'}`,fontSize:14,fontFamily:'var(--font-body)',outline:'none',marginBottom:10,color:'#1C1C1E' }} />
+            <button disabled={deleteWord!==t('settings.deleteWord')}
+              onClick={()=>{if(deleteWord===t('settings.deleteWord')){localStorage.clear();window.location.reload()}}}
+              style={{ width:'100%',padding:'12px',borderRadius:10,border:'none',background:deleteWord===t('settings.deleteWord')?'#FF3B30':'rgba(0,0,0,0.06)',color:deleteWord===t('settings.deleteWord')?'#fff':'#C7C7CC',fontSize:14,fontWeight:700,cursor:deleteWord===t('settings.deleteWord')?'pointer':'default',fontFamily:'var(--font-heading)' }}>
+              {t('settings.deleteBtn')}
             </button>
           </div>
         </SettingsGroup>
@@ -660,18 +666,18 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
     // ── SUBSCRIPTION ───────────────────────────────────────────────────────
     case 'subscription': return (
       <div>
-        <SectionTitle>Plan</SectionTitle>
+        <SectionTitle>{t('settings.plan')}</SectionTitle>
 
         <div style={{ padding:'20px', borderRadius:18, background:'linear-gradient(135deg,#007AFF,#5856D6)', color:'#fff', marginBottom:20, boxShadow:'0 8px 24px rgba(0,122,255,0.35)' }}>
-          <p style={{ fontSize:12,fontWeight:600,opacity:0.7,textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:4 }}>Plan actual</p>
-          <p style={{ fontSize:26,fontWeight:900,fontFamily:'var(--font-heading)',marginBottom:4 }}>Free</p>
-          <p style={{ fontSize:13,opacity:0.8 }}>5 miembros · 30 tasks/mes</p>
+          <p style={{ fontSize:12,fontWeight:600,opacity:0.7,textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:4 }}>{t('settings.currentPlan')}</p>
+          <p style={{ fontSize:26,fontWeight:900,fontFamily:'var(--font-heading)',marginBottom:4 }}>{t('settings.planFree')}</p>
+          <p style={{ fontSize:13,opacity:0.8 }}>{t('settings.planFreeDesc')}</p>
         </div>
 
-        <SettingsGroup label="Planes disponibles">
+        <SettingsGroup label={t('settings.availablePlans')}>
           {[
-            { name:'Pro', price:'$4.99/mes', color:'#007AFF', features:['Miembros ilimitados','Tasks sin límite','Historial completo'] },
-            { name:'Family Pro', price:'$9.99/mes', color:'#AF52DE', features:['Todo en Pro','8 miembros','Soporte prioritario'] },
+            { name:'Pro', price:'$4.99/mo', color:'#007AFF', features:['Unlimited members','Unlimited tasks','Full history'] },
+            { name:'Family Pro', price:'$9.99/mo', color:'#AF52DE', features:['Everything in Pro','8 members','Priority support'] },
           ].map((plan,i,arr)=>(
             <div key={plan.name} style={{ padding:'16px', borderBottom: i<arr.length-1?'1px solid rgba(0,0,0,0.06)':'none' }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
@@ -679,9 +685,9 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
                   <p style={{ fontSize:16,fontWeight:800,color:plan.color,fontFamily:'var(--font-heading)' }}>{plan.name}</p>
                   <p style={{ fontSize:13,color:'#8E8E93',marginTop:2 }}>{plan.price}</p>
                 </div>
-                <button onClick={()=>toast('Próximamente: Stripe Checkout')}
+                <button onClick={()=>toast(t('common.soon'))}
                   style={{ padding:'8px 20px',borderRadius:99,border:`1.5px solid ${plan.color}`,background:`rgba(${plan.color==='#007AFF'?'0,122,255':'175,82,222'},0.10)`,color:plan.color,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'var(--font-body)' }}>
-                  Upgrade
+                  {t('settings.upgrade')}
                 </button>
               </div>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
@@ -698,28 +704,28 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
     // ── ABOUT ──────────────────────────────────────────────────────────────
     case 'about': return (
       <div>
-        <SectionTitle>Acerca de</SectionTitle>
+        <SectionTitle>{t('settings.about')}</SectionTitle>
 
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'28px 0', marginBottom:20 }}>
           <div style={{ width:80,height:80,borderRadius:20,background:'linear-gradient(135deg,#E07B8A,#D45C6B)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'var(--font-heading)',fontWeight:900,fontSize:28,color:'#fff',boxShadow:'0 6px 20px rgba(224,123,138,0.40)',marginBottom:14 }}>FQ</div>
           <p style={{ fontSize:22,fontWeight:900,fontFamily:'var(--font-heading)',color:'#1C1C1E' }}>FamilyQuest</p>
-          <p style={{ fontSize:14,color:'#8E8E93',marginTop:4 }}>Versión 1.0.0</p>
+          <p style={{ fontSize:14,color:'#8E8E93',marginTop:4 }}>{t('settings.version')} 1.0.0</p>
         </div>
 
         <SettingsGroup>
           {[
-            { l:'Términos de uso',        e:'📄', onClick:()=>toast('Próximamente') },
-            { l:'Política de privacidad', e:'🔏', onClick:()=>toast('Próximamente') },
-            { l:'Contacto / Soporte',     e:'💬', onClick:()=>toast('hola@familyquest.app') },
-            { l:'Calificar la app',       e:'⭐', onClick:()=>toast('¡Gracias!'), last:true },
+            { lk:'settings.terms',   e:'📄', onClick:()=>toast(t('common.soon')) },
+            { lk:'settings.privacy', e:'🔏', onClick:()=>toast(t('common.soon')) },
+            { lk:'settings.support', e:'💬', onClick:()=>toast('hola@familyquest.app') },
+            { lk:'settings.rate',    e:'⭐', onClick:()=>toast('🙏') },
           ].map((item,i,arr)=>(
-            <SettingsRow key={item.l} icon={<span style={{ fontSize:16 }}>{item.e}</span>} iconBg="transparent"
-              label={item.l} showArrow onClick={item.onClick} last={i===arr.length-1} />
+            <SettingsRow key={item.lk} icon={<span style={{ fontSize:16 }}>{item.e}</span>} iconBg="transparent"
+              label={t(item.lk)} showArrow onClick={item.onClick} last={i===arr.length-1} />
           ))}
         </SettingsGroup>
 
         <p style={{ textAlign:'center',fontSize:12,color:'#C7C7CC',marginTop:20 }}>
-          Hecho con ❤️ para las familias · © 2026 FamilyQuest
+          {t('settings.madeWith')}
         </p>
       </div>
     )
