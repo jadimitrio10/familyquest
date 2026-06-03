@@ -51,6 +51,26 @@ const COLOR_OPTIONS = [
   { bg:'#CCFBF1',text:'#134E4A',bar:'#2DD4BF' },
 ]
 
+// ── Module-level helpers — STABLE references (no re-create on re-render) ──
+// Moving these OUTSIDE the component prevents React from unmounting
+// inputs on every keystroke (which caused the "one letter then lose focus" bug)
+
+function SectionCard({ children }: { children: React.ReactNode }) {
+  return <div className="card p-5 mb-4">{children}</div>
+}
+
+function Row({ label, sub, children }: { label: string; sub?: string; children?: React.ReactNode }) {
+  return (
+    <div className="settings-row">
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>{label}</p>
+        {sub && <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>{sub}</p>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
 interface SettingsViewProps {
   settings: AppSettings
   onUpdate: (patch: Partial<AppSettings>) => void
@@ -116,21 +136,6 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
     onUpdate({ familyName: profileForm.name, timeFormat: profileForm.timeFormat as any })
     toast.success('Perfil guardado ✅')
   }
-
-  // ── Row component ──
-  const Row = ({ label, sub, children }: { label:string; sub?:string; children?:React.ReactNode }) => (
-    <div className="settings-row">
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold text-sm" style={{ color:'var(--text-1)' }}>{label}</p>
-        {sub && <p className="text-xs mt-0.5" style={{ color:'var(--text-3)' }}>{sub}</p>}
-      </div>
-      {children}
-    </div>
-  )
-
-  const SectionCard = ({ children }: { children:React.ReactNode }) => (
-    <div className="card p-5 mb-4">{children}</div>
-  )
 
   const sections: Record<SectionId, React.ReactNode> = {
     // ── PROFILE ──

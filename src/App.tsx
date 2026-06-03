@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useWeather } from '@/hooks/useWeather'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Calendar, CheckSquare, Star, UtensilsCrossed, Image, Moon, Settings, CloudSun } from 'lucide-react'
 import { Toaster } from 'react-hot-toast'
@@ -29,6 +30,19 @@ export default function App() {
   const [hovered, setHovered] = useState<string | null>(null)
   const { settings, update } = useAppSettings()
   const { members } = useMembersStore()
+  const weather = useWeather()
+  const [clockTime, setClockTime] = useState('')
+
+  // Live clock
+  useEffect(() => {
+    function tick() {
+      const now = new Date()
+      setClockTime(now.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit', hour12:true }))
+    }
+    tick()
+    const id = setInterval(tick, 10000)
+    return () => clearInterval(id)
+  }, [])
 
   return (
     <>
@@ -60,14 +74,17 @@ export default function App() {
         padding: '12px 0',
         flexShrink: 0, zIndex: 10,
       }}>
-        {/* Weather */}
+        {/* Weather — Miami real data */}
         <div style={{ display:'flex', flexDirection:'column', alignItems:'center', marginBottom:6, paddingBottom:8, borderBottom:'1px solid var(--border)', width:'80%' }}>
-          <CloudSun size={20} color="#94A3B8" strokeWidth={1.8} />
+          <span style={{ fontSize:20, lineHeight:1 }}>{weather?.emoji ?? '🌡️'}</span>
           <p style={{ fontWeight:800, fontSize:17, color:'var(--text-1)', fontFamily:'var(--font-heading)', lineHeight:1.1, marginTop:3 }}>
-            68°{settings.temperatureUnit}
+            {weather
+              ? (settings.temperatureUnit === 'F' ? `${weather.tempF}°F` : `${weather.temp}°C`)
+              : '—'
+            }
           </p>
-          <p style={{ fontWeight:600, fontSize:7, color:'var(--text-3)', letterSpacing:'0.08em', textTransform:'uppercase', textAlign:'center', lineHeight:1.3, marginTop:2 }}>
-            PARTLY<br/>CLOUDY
+          <p style={{ fontWeight:600, fontSize:6.5, color:'var(--text-3)', letterSpacing:'0.07em', textTransform:'uppercase', textAlign:'center', lineHeight:1.3, marginTop:2 }}>
+            {weather?.description.split(' ').join('\n') ?? 'WEATHER'}
           </p>
         </div>
 
