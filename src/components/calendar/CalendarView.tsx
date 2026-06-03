@@ -39,6 +39,8 @@ interface StoredTask {
   id:string; title:string; emoji:string; memberId:string
   type:'fixed'|'once'; done:boolean; dueDate?:string
   startTime?:string; endTime?:string; allDay?:boolean
+  daysOfWeek?: number[]  // 0=Mon 1=Tue...6=Sun; undefined = every day
+  points?: number
 }
 
 function loadTaskEvents(weekDates: string[]): CalendarEvent[] {
@@ -61,6 +63,15 @@ function loadTaskEvents(weekDates: string[]): CalendarEvent[] {
 
       if (t.type === 'fixed') {
         for (const date of weekDates) {
+          // Check if this date's day-of-week is in the task's schedule
+          // date = 'YYYY-MM-DD'; dayOfWeek 0=Mon...6=Sun
+          if (t.daysOfWeek && t.daysOfWeek.length > 0) {
+            const d = new Date(date + 'T12:00:00')
+            const jsDay = d.getDay()  // 0=Sun...6=Sat
+            // Convert JS day to our Mon-based 0-6: Mon=0,Tue=1,...Sun=6
+            const ourDay = jsDay === 0 ? 6 : jsDay - 1
+            if (!t.daysOfWeek.includes(ourDay)) continue
+          }
           const key = `${t.id}:${date}`
           events.push(makeEvent(date, key))
         }

@@ -18,8 +18,11 @@ export interface Task {
   startTime?: string
   endTime?: string
   allDay?: boolean
+  // Days of week: 0=Mon 1=Tue 2=Wed 3=Thu 4=Fri 5=Sat 6=Sun
+  // undefined = every day; [] = every day; specific array = those days only
+  daysOfWeek?: number[]
   // Points
-  points: number        // points awarded on completion
+  points: number
 }
 
 const STORAGE_KEY = 'fq_tasks_v2'
@@ -77,7 +80,9 @@ export function TasksView() {
   const [libItem, setLibItem]           = useState<{ e: string; t: string } | null>(null)
   const emojiRef                        = useRef<HTMLDivElement>(null)
 
-  const [form, setForm] = useState({
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null)
+
+  const emptyForm = () => ({
     title: '', emoji: '✅',
     type: 'once' as 'fixed' | 'once',
     priority: 'medium' as 'high' | 'medium' | 'low',
@@ -86,7 +91,11 @@ export function TasksView() {
     startTime: '08:00',
     endTime: '09:00',
     points: 10,
+    daysPreset: 'everyday' as 'everyday' | 'weekdays' | 'weekends' | 'custom',
+    daysCustom: [] as number[],
   })
+
+  const [form, setForm] = useState(emptyForm())
 
   useEffect(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)) } catch {}
@@ -120,20 +129,68 @@ export function TasksView() {
     setFlow('form')
   }
 
+  // Compute daysOfWeek from preset
+  function getDaysOfWeek(): number[] | undefined {
+    if (form.type !== 'fixed') return undefined
+    if (form.daysPreset === 'everyday')  return undefined         // show every day
+    if (form.daysPreset === 'weekdays')  return [0,1,2,3,4]      // Mon–Fri
+    if (form.daysPreset === 'weekends')  return [5,6]             // Sat–Sun
+    if (form.daysPreset === 'custom')    return form.daysCustom   // user-picked
+    return undefined
+  }
+
+  // Open edit mode for a task
+  function openEdit(task: Task) {
+    // Determine preset from daysOfWeek
+    let preset: 'everyday' | 'weekdays' | 'weekends' | 'custom' = 'everyday'
+    let custom: number[] = []
+    const d = task.daysOfWeek
+    if (d && d.length > 0) {
+      const s = [...d].sort().join(',')
+      if (s === '0,1,2,3,4') preset = 'weekdays'
+      else if (s === '5,6')  preset = 'weekends'
+      else                   { preset = 'custom'; custom = d }
+    }
+    setEditingTaskId(task.id)
+    setForm({
+      title: task.title, emoji: task.emoji,
+      type: task.type, priority: task.priority,
+      dueDate: task.dueDate || '',
+      notes: task.notes || '',
+      hasTime: !!task.startTime,
+      startTime: task.startTime || '08:00',
+      endTime: task.endTime || '09:00',
+      points: task.points || 10,
+      daysPreset: preset,
+      daysCustom: custom,
+    })
+    setFlow('form')
+  }
+
   function addTask() {
     if (!form.title.trim()) return
-    setTasks(ts => [...ts, {
-      id: `t-${Date.now()}`, memberId,
+    const daysOfWeek = getDaysOfWeek()
+    const taskData = {
+      memberId,
       title: form.title.trim(), emoji: form.emoji,
       done: false, type: form.type, priority: form.priority,
       dueDate: form.dueDate || undefined,
       notes: form.notes || undefined,
-      // Time scheduling
       allDay: !form.hasTime,
       startTime: form.hasTime ? form.startTime : undefined,
       endTime:   form.hasTime ? form.endTime   : undefined,
       points: form.points,
-    }])
+      daysOfWeek,
+    }
+
+    if (editingTaskId) {
+      // EDIT existing task
+      setTasks(ts => ts.map(t => t.id === editingTaskId ? { ...t, ...taskData } : t))
+      setEditingTaskId(null)
+    } else {
+      // CREATE new task
+      setTasks(ts => [...ts, { id: `t-${Date.now()}`, ...taskData }])
+    }
 
     // Queue: if more library items selected
     if (libSelected.size > 1 && libItem) {
@@ -152,7 +209,8 @@ export function TasksView() {
 
   function closeAll() {
     setFlow(null); setLibSelected(new Set()); setLibItem(null); setShowEmoji(false)
-    setForm({ title: '', emoji: '✅', type: 'once', priority: 'medium', dueDate: '', notes: '', hasTime: false, startTime: '08:00', endTime: '09:00', points: 10 })
+    setForm(emptyForm())
+    setEditingTaskId(null)
   }
 
   // ── RENDER ──────────────────────────────────────────────
@@ -314,7 +372,7 @@ export function TasksView() {
               </motion.button>
             }
           >
-            {fixedP.map((task, i) => <AppleTaskCard key={task.id} task={task} member={member} onToggle={toggle} onRemove={remove} delay={i * 0.04} />)}
+            {fixedP.map((task, i) => <AppleTaskCard key={task.id} task={task} member={member} onToggle={toggle} onRemove={remove} delay={i * 0.04} onEdit={openEdit} />)}
             {fixedP.length === 0 && <AppleEmptySection emoji="🔄" text="Sin tasks fijos" sub="Agrega tareas que se repiten diario" onAdd={() => setFlow('choose')} />}
           </AppleSection>
 
@@ -323,7 +381,7 @@ export function TasksView() {
             count={onceP.length} accent="#FF9500"
             expanded={expanded.once} onToggle={() => toggleSec('once')}
           >
-            {onceP.map((task, i) => <AppleTaskCard key={task.id} task={task} member={member} onToggle={toggle} onRemove={remove} delay={i * 0.04} />)}
+            {onceP.map((task, i) => <AppleTaskCard key={task.id} task={task} member={member} onToggle={toggle} onRemove={remove} delay={i * 0.04} onEdit={openEdit} />)}
             {onceP.length === 0 && <AppleEmptySection emoji="📅" text="Sin tasks pendientes" sub="Agrega tareas para este miembro" onAdd={() => setFlow('choose')} />}
           </AppleSection>
 
@@ -331,7 +389,7 @@ export function TasksView() {
             icon="✅" title="Completados" count={doneT.length}
             accent="#34C759" expanded={expanded.done} onToggle={() => toggleSec('done')} dimmed
           >
-            {doneT.map((task, i) => <AppleTaskCard key={task.id} task={task} member={member} onToggle={toggle} onRemove={remove} delay={i * 0.03} dimmed />)}
+            {doneT.map((task, i) => <AppleTaskCard key={task.id} task={task} member={member} onToggle={toggle} onRemove={remove} delay={i * 0.03} dimmed onEdit={openEdit} />)}
           </AppleSection>
 
           {myTasks.length === 0 && (
@@ -494,7 +552,7 @@ export function TasksView() {
               )}
               <div style={{ flex: 1 }}>
                 <h2 style={{ fontSize: 20, fontWeight: 900, fontFamily: 'var(--font-heading)' }}>
-                  {libItem ? `Configurar task` : '✏️ Nuevo Task'}
+                  {editingTaskId ? '✏️ Editar Task' : libItem ? `Configurar task` : '✏️ Nuevo Task'}
                 </h2>
                 {libSelected.size > 1 && libItem && (
                   <p style={{ fontSize: 12, color: 'var(--text-3)', marginTop: 2 }}>{libSelected.size} seleccionados · uno a la vez</p>
@@ -545,6 +603,66 @@ export function TasksView() {
               layoutId="type-seg"
               style={{ marginBottom: 14 }}
             />
+
+            {/* ── DAYS OF WEEK (only for Fixed tasks) ── */}
+            {form.type === 'fixed' && (
+              <>
+                <FormLabel>¿Qué días se repite?</FormLabel>
+                <div style={{ marginBottom:14 }}>
+                  {/* Preset pills */}
+                  <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:10 }}>
+                    {[
+                      { v:'everyday',  l:'Todos los días', e:'📅' },
+                      { v:'weekdays',  l:'Lun–Vie (escuela)', e:'🎒' },
+                      { v:'weekends',  l:'Sáb–Dom', e:'🏖️' },
+                      { v:'custom',    l:'Personalizado', e:'⚙️' },
+                    ].map(opt => (
+                      <motion.button key={opt.v} whileTap={{ scale:0.93 }}
+                        onClick={() => setForm(f => ({ ...f, daysPreset: opt.v as any }))}
+                        style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', borderRadius:99, border:`2px solid ${form.daysPreset===opt.v ? accent : 'rgba(0,0,0,0.08)'}`, background:form.daysPreset===opt.v ? `${accent}12` : 'rgba(255,255,255,0.80)', fontSize:13, fontWeight:700, color:form.daysPreset===opt.v ? accent : 'var(--text-2)', cursor:'pointer', fontFamily:'var(--font-body)', transition:'all 0.15s' }}>
+                        <span>{opt.e}</span>{opt.l}
+                      </motion.button>
+                    ))}
+                  </div>
+
+                  {/* Custom day checkboxes */}
+                  {form.daysPreset === 'custom' && (
+                    <motion.div initial={{ opacity:0, y:-6 }} animate={{ opacity:1, y:0 }}
+                      style={{ display:'flex', gap:8, flexWrap:'wrap', padding:'12px 16px', borderRadius:14, background:'rgba(255,255,255,0.80)', border:`1.5px solid ${accent}40` }}>
+                      {['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map((day, i) => {
+                        const selected = form.daysCustom.includes(i)
+                        return (
+                          <motion.button key={day} whileTap={{ scale:0.85 }}
+                            onClick={() => setForm(f => ({
+                              ...f,
+                              daysCustom: selected
+                                ? f.daysCustom.filter(d => d !== i)
+                                : [...f.daysCustom, i].sort()
+                            }))}
+                            style={{ width:44, height:44, borderRadius:'50%', border:`2px solid ${selected ? accent : 'rgba(0,0,0,0.10)'}`, background:selected ? accent : 'rgba(255,255,255,0.90)', fontSize:11, fontWeight:800, color:selected ? '#fff' : 'var(--text-3)', cursor:'pointer', fontFamily:'var(--font-heading)', boxShadow:selected ? `0 2px 8px ${accent}40` : 'none', transition:'all 0.15s' }}>
+                            {day}
+                          </motion.button>
+                        )
+                      })}
+                      {form.daysCustom.length === 0 && (
+                        <p style={{ fontSize:12, color:'var(--text-3)', alignSelf:'center', padding:'0 4px' }}>
+                          Selecciona al menos un día
+                        </p>
+                      )}
+                    </motion.div>
+                  )}
+
+                  {/* Summary */}
+                  <p style={{ fontSize:11, color:'var(--text-3)', marginTop:8 }}>
+                    {form.daysPreset === 'everyday'  && '📅 Aparecerá todos los días de la semana'}
+                    {form.daysPreset === 'weekdays'  && '🎒 Solo Lunes a Viernes — no aparece el fin de semana'}
+                    {form.daysPreset === 'weekends'  && '🏖️ Solo Sábado y Domingo'}
+                    {form.daysPreset === 'custom' && form.daysCustom.length > 0 &&
+                      `⚙️ Solo: ${['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].filter((_,i) => form.daysCustom.includes(i)).join(', ')}`}
+                  </p>
+                </div>
+              </>
+            )}
 
             {/* Priority — Apple Segmented */}
             <FormLabel>Prioridad</FormLabel>
@@ -702,7 +820,7 @@ export function TasksView() {
                 style={{ flex: 1, padding: '14px', fontSize: 15, borderRadius: 16 }}
               >
                 <Sparkles size={16} />
-                {libSelected.size > 1 ? `Agregar y seguir (${libSelected.size - 1} más)` : 'Agregar Task'}
+                {editingTaskId ? '💾 Guardar cambios' : libSelected.size > 1 ? `Agregar y seguir (${libSelected.size - 1} más)` : '✨ Agregar Task'}
               </motion.button>
               <motion.button
                 whileTap={{ scale: 0.97 }}
@@ -847,12 +965,24 @@ function AppleEmptySection({ emoji, text, sub, onAdd }: { emoji: string; text: s
   )
 }
 
+// Day names helper
+const DAY_NAMES = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+
+function daysLabel(daysOfWeek?: number[]): string | null {
+  if (!daysOfWeek || daysOfWeek.length === 0) return null
+  const s = [...daysOfWeek].sort().join(',')
+  if (s === '0,1,2,3,4') return '🎒 Lun–Vie'
+  if (s === '5,6')        return '🏖️ Sáb–Dom'
+  return '📅 ' + daysOfWeek.sort().map(d => DAY_NAMES[d]).join(' · ')
+}
+
 // Task Card
-function AppleTaskCard({ task, member, onToggle, onRemove, delay = 0, dimmed }: {
+function AppleTaskCard({ task, member, onToggle, onRemove, onEdit, delay = 0, dimmed }: {
   task: Task
   member?: { barColor: string; bgColor: string; textColor: string } | null
   onToggle: (id: string) => void
   onRemove: (id: string) => void
+  onEdit: (task: Task) => void
   delay?: number; dimmed?: boolean
 }) {
   const p   = PRIORITY[task.priority]
@@ -869,23 +999,25 @@ function AppleTaskCard({ task, member, onToggle, onRemove, delay = 0, dimmed }: 
       onHoverStart={() => setHov(true)}
       onHoverEnd={() => setHov(false)}
       whileHover={{ y: -1 }}
+      onClick={() => !task.done && onEdit(task)}
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
         padding: '13px 16px', borderRadius: 18, marginBottom: 8,
         background: 'rgba(255,255,255,0.70)',
         backdropFilter: 'blur(20px)',
-        border: `1.5px solid ${hov && !task.done ? acc + '35' : 'rgba(255,255,255,0.60)'}`,
+        border: `1.5px solid ${hov && !task.done ? acc + '45' : 'rgba(255,255,255,0.60)'}`,
         boxShadow: hov && !task.done
           ? `0 8px 24px rgba(0,0,0,0.09), 0 0 0 1px ${acc}20`
           : '0 2px 8px rgba(0,0,0,0.06)',
         transition: 'border-color 0.15s, box-shadow 0.15s',
+        cursor: task.done ? 'default' : 'pointer',
       }}
     >
       {/* Checkbox */}
       <motion.button
         whileTap={{ scale: 0.75 }}
         transition={AP}
-        onClick={() => onToggle(task.id)}
+        onClick={e => { e.stopPropagation(); onToggle(task.id) }}
         style={{
           width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
           border: `2.5px solid ${task.done ? acc : 'rgba(0,0,0,0.15)'}`,
@@ -940,12 +1072,22 @@ function AppleTaskCard({ task, member, onToggle, onRemove, delay = 0, dimmed }: 
               <CalendarDays size={10} /> {task.dueDate}
             </span>
           )}
+          {/* Days of week label */}
+          {task.type === 'fixed' && daysLabel(task.daysOfWeek) && (
+            <span style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:11, fontWeight:700, color:'var(--text-3)', background:'rgba(0,0,0,0.05)', padding:'2px 8px', borderRadius:99 }}>
+              {daysLabel(task.daysOfWeek)}
+            </span>
+          )}
           {task.notes && (
             <span style={{ fontSize: 11, color: 'var(--text-3)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               · {task.notes}
             </span>
           )}
         </div>
+        {/* Edit hint on hover */}
+        {hov && !task.done && (
+          <p style={{ fontSize:10, color: acc, fontWeight:600, marginTop:2 }}>Toca para editar ✏️</p>
+        )}
       </div>
 
       {/* Delete on hover */}
@@ -955,7 +1097,7 @@ function AppleTaskCard({ task, member, onToggle, onRemove, delay = 0, dimmed }: 
             initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.7 }}
             transition={{ duration: 0.12 }}
             whileTap={{ scale: 0.88 }}
-            onClick={() => onRemove(task.id)}
+            onClick={e => { e.stopPropagation(); onRemove(task.id) }}
             style={{ width: 30, height: 30, borderRadius: 10, border: 'none', background: 'rgba(255,59,48,0.10)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FF3B30', flexShrink: 0 }}
           >
             <Trash2 size={14} />
