@@ -227,10 +227,8 @@ export function CalendarView({ members: rawMembers, calPrefs }: { members?: Memb
     points: number; taskTitle: string; taskEmoji: string
   } | null>(null)
 
-  useEffect(() => {
-    const id = setInterval(() => setTick(n => n+1), 2000)
-    return () => clearInterval(id)
-  }, [])
+  // No interval — tick only increments on user action (task toggle)
+  // A 2-second interval was causing continuous re-renders and jitter
 
   const { events:calEvents, toggleEvent, addEvent, deleteEvent, updateEvent } = useCalendarStore()
   const { awardPoints, removePoints } = usePointsStore()

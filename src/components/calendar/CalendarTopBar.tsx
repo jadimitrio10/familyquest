@@ -213,17 +213,13 @@ export function CalendarTopBar({
                     }}>
                       {stat.done}/{stat.total}
                     </span>
-                    {/* Mini progress bar */}
+                    {/* Mini progress bar — CSS transition, no framer re-init */}
                     <div style={{ width:36, height:3, borderRadius:99, background:'rgba(0,0,0,0.10)', overflow:'hidden' }}>
-                      <motion.div
-                        initial={{ width:0 }}
-                        animate={{ width:`${pct}%` }}
-                        transition={{ duration:0.6, ease:'easeOut' }}
-                        style={{
-                          height:'100%', borderRadius:99,
-                          background: pct === 100 ? '#34C759' : (isActive ? m.barColor : m.barColor),
-                        }}
-                      />
+                      <div style={{
+                        width:`${pct}%`, height:'100%', borderRadius:99,
+                        background: pct === 100 ? '#34C759' : m.barColor,
+                        transition: 'width 0.5s ease',
+                      }} />
                     </div>
                     <span style={{
                       fontSize:10, fontWeight:700,
