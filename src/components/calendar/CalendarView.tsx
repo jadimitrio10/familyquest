@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, Trash2 } from 'lucide-react'
 import type { CalendarPrefs } from '@/hooks/useCalendarPrefs'
 import { useT, T } from '@/lib/i18n'
-import { CalendarTopBar } from './CalendarTopBar'
+import { CalendarTopBar, type MemberStat } from './CalendarTopBar'
 import { MemberChip } from './MemberChip'
 import { AddEventModal } from './AddEventModal'
 import { EventDetailModal } from './EventDetailModal'
@@ -306,6 +306,21 @@ export function CalendarView({ members: rawMembers, calPrefs }: { members?: Memb
 
   const nextLabel = `${format(addDays(weekStart,7),'MMM d')}–${format(addDays(weekStart,13),'MMM d')}`
 
+  // ── Per-member stats for TODAY (shown in member chips) ──────────────────
+  const memberStats = useMemo((): Record<string, MemberStat> => {
+    const today = format(new Date(), 'yyyy-MM-dd')
+    const todayEvents = allEvents.filter(e => e.date === today)
+    const stats: Record<string, MemberStat> = {}
+    for (const ev of todayEvents) {
+      if (!ev.memberId) continue
+      if (!stats[ev.memberId]) stats[ev.memberId] = { done: 0, total: 0 }
+      stats[ev.memberId].total++
+      if (ev.completed) stats[ev.memberId].done++
+    }
+    return stats
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allEvents, tick])
+
   // Apply showWeekends preference: if disabled, hide Sat(5) and Sun(6)
   const showWeekends = calPrefs?.showWeekends !== false
   const visibleDays  = showWeekends ? weekDays : weekDays.filter(d => {
@@ -331,6 +346,7 @@ export function CalendarView({ members: rawMembers, calPrefs }: { members?: Memb
         onToggleMember={(id) => setActiveMember(prev => prev === id || id === '' ? null : id)}
         familyEvents={familyEvents}
         onEditFamilyEvents={() => setShowFamilyModal(true)}
+        memberStats={memberStats}
       />
 
       {/* Calendar body — time grid exactly like Stitch */}
@@ -531,13 +547,14 @@ function TimeColumn({ events, members, onToggle, onEventClick, colIndex, compact
                   {event.completed && <Check size={11} color="#fff" strokeWidth={3} />}
                 </motion.button>
               </div>
-              {/* Avatar bottom right */}
+              {/* Avatar bottom right — photo or emoji/initial */}
               <div style={{ display:'flex', justifyContent:'flex-end', marginTop:4 }}>
                 {member.photoDataUrl ? (
-                  <img src={member.photoDataUrl} alt={member.name} style={{ width:18,height:18,borderRadius:'50%',objectFit:'cover',border:'2px solid rgba(255,255,255,0.80)',boxShadow:'0 1px 3px rgba(0,0,0,0.10)' }} />
+                  <img src={member.photoDataUrl} alt={member.name}
+                    style={{ width:22,height:22,borderRadius:'50%',objectFit:'cover',border:`2px solid ${barC}`,boxShadow:'0 1px 4px rgba(0,0,0,0.15)' }} />
                 ) : (
-                  <div style={{ width:18,height:18,borderRadius:'50%',background:barC,border:'2px solid rgba(255,255,255,0.80)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:9,fontWeight:700,color:'#fff' }}>
-                    {(member.avatar||member.name||'?')[0].toUpperCase()}
+                  <div style={{ width:22,height:22,borderRadius:'50%',background:member.bgColor,border:`2px solid ${barC}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,boxShadow:'0 1px 4px rgba(0,0,0,0.10)' }}>
+                    {member.emoji || (member.avatar||member.name||'?')[0]}
                   </div>
                 )}
               </div>
@@ -591,10 +608,11 @@ function TimeColumn({ events, members, onToggle, onEventClick, colIndex, compact
                 {event.startTime}{event.endTime ? ` - ${event.endTime}` : ''}
               </p>
               {member.photoDataUrl ? (
-                <img src={member.photoDataUrl} alt={member.name} style={{ width:18,height:18,borderRadius:'50%',objectFit:'cover',border:'2px solid rgba(255,255,255,0.8)',flexShrink:0 }} />
+                <img src={member.photoDataUrl} alt={member.name}
+                  style={{ width:22,height:22,borderRadius:'50%',objectFit:'cover',border:`2px solid ${barC}`,flexShrink:0,boxShadow:'0 1px 4px rgba(0,0,0,0.15)' }} />
               ) : (
-                <div style={{ width:18,height:18,borderRadius:'50%',background:barC,border:'2px solid rgba(255,255,255,0.8)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:8,fontWeight:700,color:'#fff',flexShrink:0 }}>
-                  {(member.avatar||'?')[0].toUpperCase()}
+                <div style={{ width:22,height:22,borderRadius:'50%',background:member.bgColor,border:`2px solid ${barC}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,flexShrink:0 }}>
+                  {member.emoji || (member.avatar||'?')[0]}
                 </div>
               )}
             </div>

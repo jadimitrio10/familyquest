@@ -8,6 +8,12 @@ import { MemberAvatar } from '@/components/shared/MemberAvatar'
 import { useAppSettings } from '@/hooks/useAppStore'
 import type { FamilyEvent } from './CalendarView'
 
+// Per-member completion stats for today
+export interface MemberStat {
+  done: number
+  total: number
+}
+
 interface CalendarTopBarProps {
   weekStart: Date
   weekEnd: Date
@@ -18,11 +24,13 @@ interface CalendarTopBarProps {
   onToggleMember: (id: string) => void
   familyEvents?: FamilyEvent[]
   onEditFamilyEvents?: () => void
+  memberStats?: Record<string, MemberStat>   // ← NEW: completion data per member
 }
 
 export function CalendarTopBar({
   weekStart, weekEnd, onAddEvent, onPrev, onNext,
   activeMember, onToggleMember, familyEvents = [], onEditFamilyEvents,
+  memberStats = {},
 }: CalendarTopBarProps) {
   const weather       = useWeather()
   const { members }   = useMembersStore()
@@ -157,9 +165,12 @@ export function CalendarTopBar({
           </motion.button>
         </div>
 
-        {/* One pill per member — clicking filters the calendar */}
+        {/* One pill per member — photo + name + completion stats */}
         {members.map(m => {
           const isActive = activeMember === m.id
+          const stat = memberStats[m.id]
+          const pct  = stat && stat.total > 0 ? Math.round((stat.done / stat.total) * 100) : null
+
           return (
             <motion.button
               key={m.id}
@@ -167,33 +178,65 @@ export function CalendarTopBar({
               whileHover={{ scale: 1.04, y: -1 }}
               whileTap={{ scale: 0.96 }}
               style={{
-                display:'flex', alignItems:'center', gap:7,
+                display:'flex', alignItems:'center', gap:8,
                 background: isActive ? m.bgColor : '#fff',
-                border: isActive
-                  ? `2px solid ${m.barColor}`
-                  : '1px solid #EEE8E0',
-                padding: isActive ? '5px 14px 5px 6px' : '5px 14px 5px 6px',
-                borderRadius:100,
-                cursor:'pointer',
-                boxShadow: isActive
-                  ? `0 2px 10px ${m.barColor}40`
-                  : '0 1px 4px rgba(0,0,0,0.06)',
-                transition:'all 0.15s',
+                border: isActive ? `2px solid ${m.barColor}` : '1px solid #EEE8E0',
+                padding: '5px 12px 5px 5px',
+                borderRadius: 100,
+                cursor: 'pointer',
+                boxShadow: isActive ? `0 2px 10px ${m.barColor}40` : '0 1px 4px rgba(0,0,0,0.06)',
+                transition: 'all 0.15s',
+                minWidth: 0,
               }}
             >
-              <MemberAvatar member={m} size={24} />
-              <span style={{
-                fontSize:12, fontWeight: isActive ? 800 : 700,
-                color: isActive ? m.textColor : '#2D3748',
-                fontFamily:'var(--font-body)',
-                whiteSpace:'nowrap',
-              }}>
-                {m.name}
-              </span>
-              {/* Active indicator dot */}
-              {isActive && (
-                <span style={{ width:6, height:6, borderRadius:'50%', background:m.barColor, flexShrink:0 }} />
-              )}
+              {/* Photo / avatar — bigger: 32px */}
+              <MemberAvatar member={m} size={32} />
+
+              {/* Name + stats */}
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-start', gap:1, minWidth:0 }}>
+                <span style={{
+                  fontSize:12, fontWeight: isActive ? 800 : 700,
+                  color: isActive ? m.textColor : '#2D3748',
+                  fontFamily:'var(--font-body)', whiteSpace:'nowrap', lineHeight:1.2,
+                }}>
+                  {m.name}
+                </span>
+
+                {/* Completion count + mini progress bar */}
+                {stat && stat.total > 0 ? (
+                  <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                    <span style={{
+                      fontSize:10, fontWeight:700,
+                      color: isActive ? m.textColor : (pct === 100 ? '#34C759' : '#8E8E93'),
+                      fontFamily:'var(--font-body)', lineHeight:1,
+                      opacity: isActive ? 0.85 : 1,
+                    }}>
+                      {stat.done}/{stat.total}
+                    </span>
+                    {/* Mini progress bar */}
+                    <div style={{ width:36, height:3, borderRadius:99, background:'rgba(0,0,0,0.10)', overflow:'hidden' }}>
+                      <motion.div
+                        initial={{ width:0 }}
+                        animate={{ width:`${pct}%` }}
+                        transition={{ duration:0.6, ease:'easeOut' }}
+                        style={{
+                          height:'100%', borderRadius:99,
+                          background: pct === 100 ? '#34C759' : (isActive ? m.barColor : m.barColor),
+                        }}
+                      />
+                    </div>
+                    <span style={{
+                      fontSize:10, fontWeight:700,
+                      color: pct === 100 ? '#34C759' : (isActive ? m.textColor : '#8E8E93'),
+                      fontFamily:'var(--font-body)', lineHeight:1,
+                    }}>
+                      {pct}%
+                    </span>
+                  </div>
+                ) : stat && stat.total === 0 ? (
+                  <span style={{ fontSize:10, color:'#C7C7CC', fontFamily:'var(--font-body)' }}>sin tasks hoy</span>
+                ) : null}
+              </div>
             </motion.button>
           )
         })}
