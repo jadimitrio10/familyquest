@@ -40,7 +40,7 @@ export default function App() {
   const weather = useWeather()
   const [clockTime, setClockTime] = useState('')
   const { t } = useT()
-  useAutoSync()
+  // useAutoSync() — temporarily disabled to prevent render loop
 
   const NAV = NAV_IDS.map(n => ({ ...n, label: t(`nav.${n.id}`) }))
 

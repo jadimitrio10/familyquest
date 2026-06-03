@@ -120,15 +120,24 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
   const [joinCode, setJoinCode] = useState('')
   const [showJoin, setShowJoin] = useState(false)
 
+  const [cloudDone, setCloudDone] = useState(false)
+  const [joinDone, setJoinDone]   = useState(false)
+
   async function handleCloudCreate() {
     setSyncing(true)
     try {
       const result = await createFamily(settings.familyName || 'Mi Familia')
-      if (!result) { toast.error('Error al conectar'); return }
-      await uploadLocalData(result.id)
-      toast.success(`¡Conectado! Código: ${result.code}`, { duration: 5000 })
-      window.location.reload()
-    } catch { toast.error('Sin conexión') } finally { setSyncing(false) }
+      if (!result) { toast.error('No se pudo conectar. Verifica internet.'); return }
+      // Upload without photos first (photos can be large)
+      try { await uploadLocalData(result.id) } catch (e) { console.warn('upload partial:', e) }
+      setCloudDone(true)
+      toast.success(`✅ ¡Conectado! Tu código: ${result.code}`, { duration: 8000 })
+    } catch (e) {
+      console.error(e)
+      toast.error('Error al conectar')
+    } finally {
+      setSyncing(false)
+    }
   }
 
   async function handleCloudSync() {
@@ -145,11 +154,16 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
     setSyncing(true)
     try {
       const result = await joinFamily(joinCode.trim())
-      if (!result) { toast.error('Código incorrecto'); return }
+      if (!result) { toast.error('Código incorrecto'); setSyncing(false); return }
       await downloadFamilyData(localStorage.getItem(FAMILY_ID_KEY)!)
-      toast.success(`¡Conectado a ${result.name}!`)
-      setTimeout(() => window.location.reload(), 800)
-    } catch { toast.error('Error al unirse') } finally { setSyncing(false) }
+      setJoinDone(true)
+      toast.success(`✅ ¡Conectado a ${result.name}! Recarga la página para ver los datos.`, { duration: 6000 })
+    } catch (e) {
+      console.error(e)
+      toast.error('Error al unirse')
+    } finally {
+      setSyncing(false)
+    }
   }
 
   const [editingId, setEditingId]         = useState<string|null>(null)
@@ -299,14 +313,26 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
 
               {!showJoin ? (
                 <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-                  <motion.button whileTap={{ scale:0.97 }} onClick={handleCloudCreate} disabled={syncing}
-                    style={{ padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#34C759,#28A745)', color:'#fff', fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'var(--font-heading)', boxShadow:'0 4px 16px rgba(52,199,89,0.40)', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-                    {syncing ? '⏳ Conectando...' : '🏠 Este es mi PC principal — Crear familia en la nube'}
-                  </motion.button>
+                  {cloudDone ? (
+                    <div style={{ padding:'16px', borderRadius:14, background:'rgba(52,199,89,0.10)', border:'1.5px solid rgba(52,199,89,0.30)', textAlign:'center' }}>
+                      <p style={{ fontSize:16, fontWeight:900, color:'#34C759', fontFamily:'var(--font-heading)', marginBottom:6 }}>✅ ¡Familia creada en la nube!</p>
+                      <p style={{ fontSize:13, color:'#3C3C43', marginBottom:12 }}>Tu código aparece abajo. Úsalo en el iPad.</p>
+                      <p style={{ fontSize:22, fontWeight:900, color:'#007AFF', fontFamily:'monospace', letterSpacing:'0.15em', background:'rgba(0,122,255,0.08)', padding:'10px', borderRadius:10 }}>
+                        {localStorage.getItem('fq_family_code') || '—'}
+                      </p>
+                    </div>
+                  ) : (
+                    <motion.button whileTap={{ scale:0.97 }} onClick={handleCloudCreate} disabled={syncing}
+                      style={{ padding:'14px', borderRadius:14, border:'none', background:'linear-gradient(135deg,#34C759,#28A745)', color:'#fff', fontSize:15, fontWeight:800, cursor:'pointer', fontFamily:'var(--font-heading)', boxShadow:'0 4px 16px rgba(52,199,89,0.40)', display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+                      {syncing ? '⏳ Conectando...' : '🏠 Este es mi PC principal — Crear familia en la nube'}
+                    </motion.button>
+                  )}
+                  {!cloudDone && (
                   <button onClick={() => setShowJoin(true)}
                     style={{ padding:'12px', borderRadius:14, border:'1.5px solid rgba(0,0,0,0.10)', background:'rgba(255,255,255,0.90)', color:'#007AFF', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'var(--font-body)' }}>
                     📱 Estoy en el iPad — Unirme a la familia existente
                   </button>
+                  )}
                 </div>
               ) : (
                 <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
@@ -316,10 +342,21 @@ export function SettingsView({ settings, onUpdate }: SettingsViewProps) {
                   <input value={joinCode} onChange={e=>setJoinCode(e.target.value.toUpperCase())} maxLength={8}
                     placeholder="XXXXXXXX" autoFocus
                     style={{ padding:'14px', borderRadius:12, border:'1.5px solid rgba(0,0,0,0.10)', fontSize:24, fontFamily:'monospace', fontWeight:800, textAlign:'center', letterSpacing:'0.2em', color:'#007AFF', outline:'none' }} />
-                  <motion.button whileTap={{ scale:0.97 }} onClick={handleJoin} disabled={joinCode.length<6||syncing}
-                    style={{ padding:'13px', borderRadius:14, border:'none', background: joinCode.length>=6 ? 'linear-gradient(135deg,#007AFF,#0063CC)' : '#E5E5EA', color: joinCode.length>=6 ? '#fff' : '#C7C7CC', fontSize:15, fontWeight:800, cursor: joinCode.length>=6 ? 'pointer' : 'default', fontFamily:'var(--font-heading)' }}>
-                    {syncing ? '⏳ Sincronizando...' : '🔗 Conectar y descargar datos'}
-                  </motion.button>
+                  {joinDone ? (
+                    <div style={{ padding:'16px', borderRadius:14, background:'rgba(0,122,255,0.08)', border:'1.5px solid rgba(0,122,255,0.25)', textAlign:'center' }}>
+                      <p style={{ fontSize:15, fontWeight:900, color:'#007AFF', fontFamily:'var(--font-heading)', marginBottom:6 }}>✅ ¡Datos descargados!</p>
+                      <p style={{ fontSize:13, color:'#3C3C43', marginBottom:12 }}>Toca el botón para ver tu familia en este dispositivo:</p>
+                      <button onClick={() => window.location.reload()}
+                        style={{ padding:'12px 24px', borderRadius:12, border:'none', background:'#007AFF', color:'#fff', fontSize:14, fontWeight:800, cursor:'pointer', fontFamily:'var(--font-heading)' }}>
+                        🔄 Recargar la app
+                      </button>
+                    </div>
+                  ) : (
+                    <motion.button whileTap={{ scale:0.97 }} onClick={handleJoin} disabled={joinCode.length<6||syncing}
+                      style={{ padding:'13px', borderRadius:14, border:'none', background: joinCode.length>=6 ? 'linear-gradient(135deg,#007AFF,#0063CC)' : '#E5E5EA', color: joinCode.length>=6 ? '#fff' : '#C7C7CC', fontSize:15, fontWeight:800, cursor: joinCode.length>=6 ? 'pointer' : 'default', fontFamily:'var(--font-heading)' }}>
+                      {syncing ? '⏳ Sincronizando...' : '🔗 Conectar y descargar datos'}
+                    </motion.button>
+                  )}
                   <button onClick={() => setShowJoin(false)} style={{ background:'none', border:'none', color:'#8E8E93', fontSize:13, cursor:'pointer' }}>← Volver</button>
                 </div>
               )}
