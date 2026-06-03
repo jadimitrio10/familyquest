@@ -55,15 +55,30 @@ function loadTaskEvents(weekDates: string[]): CalendarEvent[] {
   } catch { return [] }
 }
 
-// ── Kinship pastel per member ──
+// ── Kinship pastel palette (from Stitch Miller Family HTML) ──
 const KINSHIP = [
-  { bg:'#F9D2D2', text:'#6B2020', bar:'#D47070' },
-  { bg:'#D4F1EE', text:'#1A6B64', bar:'#5ABAB3' },
-  { bg:'#E2D6F3', text:'#5B3A8B', bar:'#A080D4' },
-  { bg:'#C5E5F1', text:'#1A5C7A', bar:'#5BB4D4' },
-  { bg:'#D9EAD3', text:'#2E5E2A', bar:'#70B870' },
-  { bg:'#FAE0C8', text:'#7A3A18', bar:'#D48A50' },
+  { bg:'#F9D2D2', text:'#7A2222', bar:'#D47070' }, // pink
+  { bg:'#D4F1EE', text:'#1A6B64', bar:'#5ABAB3' }, // mint
+  { bg:'#E2D6F3', text:'#5B3A8B', bar:'#A080D4' }, // lavender
+  { bg:'#C5E5F1', text:'#1A5C7A', bar:'#5BB4D4' }, // sky
+  { bg:'#D9EAD3', text:'#2E5E2A', bar:'#70B870' }, // sage
+  { bg:'#FAE0C8', text:'#7A3A18', bar:'#D48A50' }, // peach
+  { bg:'#FDE8F0', text:'#8B2252', bar:'#D470A0' }, // rose
+  { bg:'#FEF3C7', text:'#7A5A00', bar:'#D4B050' }, // yellow
 ]
+
+// Color by TITLE — so each task gets its own consistent color
+function colorForTitle(title: string) {
+  const h = [...title].reduce((a, c) => (a * 31 + c.charCodeAt(0)) & 0xffff, 0)
+  return KINSHIP[h % KINSHIP.length]
+}
+
+// Color by MEMBER — for member-colored elements
+function colorForMember(member: RichMember) {
+  if (member.bgColor) return { bg: member.bgColor, text: member.textColor, bar: member.barColor }
+  const h = [...member.id].reduce((a, c) => a + c.charCodeAt(0), 0)
+  return KINSHIP[h % KINSHIP.length]
+}
 
 // ── Hours to show in time axis ──
 const HOURS = [8,9,10,11,12,13,14,15,16,17,18,19,20]
@@ -286,16 +301,16 @@ function TimeColumn({ events, members, onToggle, onEventClick, colIndex, compact
         <div key={h} style={{ position:'absolute', left:0, right:0, top:(h-HOURS[0])*HOUR_H*(compact?1.4:1), height:1, background:'rgba(0,0,0,0.04)' }} />
       ))}
 
-      {/* All-day events (tasks) — stacked at top */}
+      {/* All-day events (tasks) — stacked at top, each with its own color */}
       <div style={{ padding:'4px 4px 0' }}>
         {allDayEvents.map((event, i) => {
           const member = members.find(m => m.id===event.memberId)
           if (!member) return null
-          const idx = Math.abs([...member.id].reduce((a,c)=>a+c.charCodeAt(0),0)) % KINSHIP.length
-          const colors = KINSHIP[idx]
-          const bg = member.bgColor || colors.bg
-          const textC = member.textColor || colors.text
-          const barC = member.barColor || colors.bar
+          // COLOR BY TITLE — every task title gets its own consistent Kinship color
+          const colors = colorForTitle(event.title)
+          const bg    = colors.bg
+          const textC = colors.text
+          const barC  = colors.bar
           return (
             <motion.div key={event.id}
               initial={{ opacity:0, y:3 }} animate={{ opacity:1, y:0 }}
@@ -336,15 +351,14 @@ function TimeColumn({ events, members, onToggle, onEventClick, colIndex, compact
         })}
       </div>
 
-      {/* Timed events — absolutely positioned */}
+      {/* Timed events — absolutely positioned, color by title */}
       {timedEvents.map(event => {
         const member = members.find(m => m.id===event.memberId)
         if (!member || !event.startTime) return null
-        const idx = Math.abs([...member.id].reduce((a,c)=>a+c.charCodeAt(0),0)) % KINSHIP.length
-        const colors = KINSHIP[idx]
-        const bg = member.bgColor || colors.bg
-        const textC = member.textColor || colors.text
-        const barC = member.barColor || colors.bar
+        const colors = colorForTitle(event.title)
+        const bg    = colors.bg
+        const textC = colors.text
+        const barC  = colors.bar
         const top  = timeToY(event.startTime) + (allDayEvents.length * 52)
         const h    = event.endTime ? timeToHeight(event.startTime, event.endTime) : 60
 

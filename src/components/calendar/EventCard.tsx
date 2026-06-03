@@ -36,12 +36,13 @@ export function EventCard({ event, member, onToggle, onClick, animDelay = 0 }: E
       ? `${event.startTime} - ${event.endTime}`
       : event.startTime ?? ''
 
-  // Stable color per member
-  const idx    = Math.abs([...member.id].reduce((a, c) => a + c.charCodeAt(0), 0)) % KINSHIP.length
-  const colors = KINSHIP[idx]
-  const bg     = member.bgColor || colors.bg
-  const textC  = member.textColor || colors.text
-  const barC   = member.barColor || colors.bar
+  // COLOR BY TITLE — each unique task title gets its own Kinship pastel
+  // This gives variety: Lavarse → pink, Hacer la cama → mint, Tarea → lavender, etc.
+  const titleHash = [...event.title].reduce((a, c) => (a * 31 + c.charCodeAt(0)) & 0xffff, 0)
+  const colors    = KINSHIP[titleHash % KINSHIP.length]
+  const bg        = colors.bg
+  const textC     = colors.text
+  const barC      = colors.bar
 
   return (
     <motion.div
