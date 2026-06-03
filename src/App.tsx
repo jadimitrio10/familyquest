@@ -66,9 +66,9 @@ export default function App() {
     document.documentElement.style.fontSize = size
   }, [(settings as any).fontSize])
 
-  // syncTick increments when Supabase pushes a change from another device
-  // → forces all stores to re-read localStorage on the next render
-  const storeKey = connected ? syncTick : 0
+  // syncTick kept only for the cloud sync indicator; NOT used as a view key
+  // (using it as key caused full view remount + animation every 8 seconds)
+  void syncTick
 
   const NAV = NAV_IDS.map(n => ({ ...n, label: t(`nav.${n.id}`) }))
 
@@ -237,7 +237,7 @@ export default function App() {
 
         <AnimatePresence mode="wait">
           <motion.div
-            key={`${activeView}-${storeKey}`}
+            key={activeView}
             initial={{ opacity:0, x:8 }}
             animate={{ opacity:1, x:0 }}
             exit={{ opacity:0, x:-8 }}
