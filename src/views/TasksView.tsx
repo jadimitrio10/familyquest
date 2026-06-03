@@ -897,18 +897,24 @@ function AppleOverlay({ children, onClose, tall }: { children: React.ReactNode; 
         transition={{ type: 'spring', stiffness: 380, damping: 30 }}
         style={{
           width: '100%', maxWidth: 520,
-          maxHeight: tall ? '88vh' : '75vh',
-          background: 'rgba(255,255,255,0.92)',
+          maxHeight: '92vh',           // always enough height
+          background: 'rgba(255,255,255,0.96)',
           backdropFilter: 'blur(40px) saturate(200%)',
           borderRadius: '28px 28px 0 0',
-          padding: '8px 24px 28px',
+          padding: '0',                // padding moved inside for correct scroll
           boxShadow: '0 -2px 60px rgba(0,0,0,0.12)',
           border: '1px solid rgba(255,255,255,0.60)',
-          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          display: 'flex', flexDirection: 'column',
+          overflow: 'hidden',
         }}
       >
-        <div style={{ width: 40, height: 4, borderRadius: 99, background: 'rgba(0,0,0,0.12)', margin: '4px auto 16px', flexShrink: 0 }} />
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflowY: tall ? 'auto' : 'visible' }}>
+        {/* Drag handle — fixed */}
+        <div style={{ width: 40, height: 4, borderRadius: 99, background: 'rgba(0,0,0,0.12)', margin: '12px auto 0', flexShrink: 0 }} />
+        {/* Scrollable content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px 32px',
+          // iOS momentum scroll
+          WebkitOverflowScrolling: 'touch' as any,
+        }}>
           {children}
         </div>
       </motion.div>
