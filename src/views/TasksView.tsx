@@ -15,9 +15,11 @@ export interface Task {
   priority: 'high' | 'medium' | 'low'
   dueDate?: string; notes?: string
   // Scheduling
-  startTime?: string   // '09:00'
-  endTime?: string     // '10:00'
-  allDay?: boolean     // true = no specific time
+  startTime?: string
+  endTime?: string
+  allDay?: boolean
+  // Points
+  points: number        // points awarded on completion
 }
 
 const STORAGE_KEY = 'fq_tasks_v2'
@@ -83,6 +85,7 @@ export function TasksView() {
     hasTime: false,
     startTime: '08:00',
     endTime: '09:00',
+    points: 10,
   })
 
   useEffect(() => {
@@ -129,6 +132,7 @@ export function TasksView() {
       allDay: !form.hasTime,
       startTime: form.hasTime ? form.startTime : undefined,
       endTime:   form.hasTime ? form.endTime   : undefined,
+      points: form.points,
     }])
 
     // Queue: if more library items selected
@@ -148,7 +152,7 @@ export function TasksView() {
 
   function closeAll() {
     setFlow(null); setLibSelected(new Set()); setLibItem(null); setShowEmoji(false)
-    setForm({ title: '', emoji: '✅', type: 'once', priority: 'medium', dueDate: '', notes: '', hasTime: false, startTime: '08:00', endTime: '09:00' })
+    setForm({ title: '', emoji: '✅', type: 'once', priority: 'medium', dueDate: '', notes: '', hasTime: false, startTime: '08:00', endTime: '09:00', points: 10 })
   }
 
   // ── RENDER ──────────────────────────────────────────────
@@ -641,6 +645,42 @@ export function TasksView() {
               </AnimatePresence>
             </div>
 
+            {/* ── POINTS ── */}
+            <FormLabel>Puntos al completar</FormLabel>
+            <div style={{ padding:'14px 16px', borderRadius:14, background:'rgba(255,255,255,0.80)', border:'1.5px solid rgba(0,0,0,0.08)', marginBottom:14 }}>
+              {/* Points display */}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:28 }}>⭐</span>
+                  <div>
+                    <p style={{ fontSize:22, fontWeight:900, color: accent, fontFamily:'var(--font-heading)', lineHeight:1 }}>
+                      {form.points}
+                    </p>
+                    <p style={{ fontSize:11, color:'var(--text-3)' }}>puntos</p>
+                  </div>
+                </div>
+                {/* Quick-pick buttons */}
+                <div style={{ display:'flex', gap:6 }}>
+                  {[5,10,20,50].map(v => (
+                    <motion.button key={v} whileTap={{ scale:0.88 }}
+                      onClick={() => setForm(f => ({ ...f, points:v }))}
+                      style={{ width:38, height:30, borderRadius:99, border:`1.5px solid ${form.points===v ? accent : 'rgba(0,0,0,0.10)'}`, background:form.points===v ? `${accent}18` : 'transparent', fontSize:12, fontWeight:700, color:form.points===v ? accent : 'var(--text-3)', cursor:'pointer', fontFamily:'var(--font-body)' }}>
+                      {v}
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+              {/* Slider */}
+              <input type="range" min={1} max={100} step={1} value={form.points}
+                onChange={e => setForm(f => ({ ...f, points:Number(e.target.value) }))}
+                style={{ width:'100%', accentColor: accent, height:4, cursor:'pointer' }}
+              />
+              <div style={{ display:'flex', justifyContent:'space-between', marginTop:4 }}>
+                <span style={{ fontSize:10, color:'var(--text-4)' }}>1</span>
+                <span style={{ fontSize:10, color:'var(--text-4)' }}>100</span>
+              </div>
+            </div>
+
             {/* Notes */}
             <FormLabel>Nota (opcional)</FormLabel>
             <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
@@ -881,6 +921,12 @@ function AppleTaskCard({ task, member, onToggle, onRemove, delay = 0, dimmed }: 
           {task.type === 'fixed' && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: 'var(--text-3)', background: 'rgba(0,0,0,0.05)', padding: '2px 8px', borderRadius: 99 }}>
               <Repeat2 size={9} /> Diario
+            </span>
+          )}
+          {/* Points badge */}
+          {task.points > 0 && (
+            <span style={{ display:'inline-flex', alignItems:'center', gap:3, fontSize:11, fontWeight:800, color:'#D97706', background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.25)', padding:'2px 8px', borderRadius:99 }}>
+              ⭐ {task.points}
             </span>
           )}
           {/* Show time if task has one */}

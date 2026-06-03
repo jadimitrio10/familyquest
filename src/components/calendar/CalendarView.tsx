@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { usePointsStore } from '@/hooks/usePointsStore'
+import toast from 'react-hot-toast'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus } from 'lucide-react'
 import { CalendarTopBar } from './CalendarTopBar'
@@ -139,6 +141,7 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
   }, [])
 
   const { events:calEvents, toggleEvent, addEvent, deleteEvent, updateEvent } = useCalendarStore()
+  const { awardPoints, removePoints } = usePointsStore()
   const MEMBERS = useMemo(() => rawMembers ? toRichMembers(rawMembers) : [], [rawMembers])
 
   const weekStart  = addDays(getMondayOfWeek(new Date()), weekOffset * 7)
@@ -157,11 +160,32 @@ export function CalendarView({ members: rawMembers }: { members?: Member[] }) {
 
   function handleToggle(id: string) {
     if (id.startsWith('task:')) {
-      const rest = id.slice('task:'.length)
+      const rest = id.slice('task:'.length)         // "{taskId}:{date}"
+      const taskId = rest.split(':')[0]
       const completions = loadCompletions()
-      completions[rest] = !completions[rest]
+      const wasCompleted = completions[rest] ?? false
+      const nowCompleted = !wasCompleted
+      completions[rest] = nowCompleted
       saveCompletions(completions)
       setTick(n => n+1)
+
+      // Award / remove points
+      try {
+        const tasks = JSON.parse(localStorage.getItem(TASKS_KEY) ?? '[]')
+        const task = tasks.find((t: any) => t.id === taskId)
+        if (task && task.points > 0) {
+          const txId = `tx-${rest}`
+          if (nowCompleted) {
+            awardPoints(task.memberId, task.points, task.title, task.emoji || '⭐', txId)
+            toast.success(`+${task.points} ⭐ para ${MEMBERS.find(m=>m.id===task.memberId)?.name ?? ''}!`, {
+              duration: 2000,
+              style: { background:'#FFFBEB', color:'#92400E', fontFamily:'var(--font-heading)', fontWeight:700, borderRadius:14 },
+            })
+          } else {
+            removePoints(task.memberId, task.points, txId)
+          }
+        }
+      } catch {}
     } else {
       toggleEvent(id)
     }
