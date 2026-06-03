@@ -11,12 +11,13 @@ export interface Member {
   role: 'adult' | 'child'
 }
 
+// Kinship palette — pastel warm family colors
 const DEFAULT_MEMBERS: Member[] = [
-  { id:'sindy',   name:'Sindy',   emoji:'👩', bgColor:'#FFE4E6', textColor:'#9F1239', barColor:'#FB7185', role:'adult'  },
-  { id:'ivan',    name:'Ivan',    emoji:'👨', bgColor:'#E0F2FE', textColor:'#075985', barColor:'#38BDF8', role:'adult'  },
-  { id:'nicolas', name:'Nicolas', emoji:'👦', bgColor:'#F3E8FF', textColor:'#6B21A8', barColor:'#C084FC', role:'child'  },
-  { id:'sofi',    name:'Sofi',    emoji:'👧', bgColor:'#DCFCE7', textColor:'#166534', barColor:'#4ADE80', role:'child'  },
-  { id:'mnauel',  name:'Mnauel',  emoji:'👦', bgColor:'#FEF3C7', textColor:'#92400E', barColor:'#FCD34D', role:'child'  },
+  { id:'sindy',   name:'Sindy',   emoji:'👩', bgColor:'#F9D2D2', textColor:'#7A2222', barColor:'#E07070', role:'adult'  },
+  { id:'ivan',    name:'Ivan',    emoji:'👨', bgColor:'#C5E5F1', textColor:'#1A5C7A', barColor:'#5BB4D4', role:'adult'  },
+  { id:'nicolas', name:'Nicolas', emoji:'👦', bgColor:'#E2D6F3', textColor:'#5B3A8B', barColor:'#A080D4', role:'child'  },
+  { id:'sofi',    name:'Sofi',    emoji:'👧', bgColor:'#D4F1EE', textColor:'#1A6B64', barColor:'#5AC4BC', role:'child'  },
+  { id:'mnauel',  name:'Mnauel',  emoji:'👦', bgColor:'#D9EAD3', textColor:'#2E5E2A', barColor:'#70B870', role:'child'  },
 ]
 
 function load(): Member[] {

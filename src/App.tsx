@@ -64,32 +64,33 @@ export default function App() {
         }}
       />
 
-      {/* Sidebar */}
+      {/* Sidebar — Miller Family style: white, clean, icon + label */}
       <aside style={{
-        width: 68,
-        background: 'var(--surface)',
-        borderRight: '1px solid var(--border)',
+        width: 72,
+        background: '#FFFFFF',
+        borderRight: '1px solid var(--border-soft)',
         height: '100vh',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
-        padding: '12px 0',
+        padding: '16px 0',
         flexShrink: 0, zIndex: 10,
+        boxShadow: '1px 0 0 var(--border-soft)',
       }}>
-        {/* Weather — Miami real data */}
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', marginBottom:6, paddingBottom:8, borderBottom:'1px solid var(--border)', width:'80%' }}>
-          <span style={{ fontSize:20, lineHeight:1 }}>{weather?.emoji ?? '🌡️'}</span>
-          <p style={{ fontWeight:800, fontSize:17, color:'var(--text-1)', fontFamily:'var(--font-heading)', lineHeight:1.1, marginTop:3 }}>
+        {/* Weather widget — compact */}
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', marginBottom:8, paddingBottom:10, borderBottom:'1px solid var(--border-soft)', width:'85%' }}>
+          <span style={{ fontSize:22, lineHeight:1 }}>{weather?.emoji ?? '🌤️'}</span>
+          <p style={{ fontWeight:700, fontSize:18, color:'var(--text-1)', fontFamily:'var(--font-serif)', lineHeight:1.1, marginTop:3 }}>
             {weather
-              ? (settings.temperatureUnit === 'F' ? `${weather.tempF}°F` : `${weather.temp}°C`)
+              ? (settings.temperatureUnit === 'F' ? `${weather.tempF}°` : `${weather.temp}°`)
               : '—'
             }
           </p>
-          <p style={{ fontWeight:600, fontSize:6.5, color:'var(--text-3)', letterSpacing:'0.07em', textTransform:'uppercase', textAlign:'center', lineHeight:1.3, marginTop:2 }}>
-            {weather?.description.split(' ').join('\n') ?? 'WEATHER'}
+          <p style={{ fontWeight:600, fontSize:7, color:'var(--text-3)', letterSpacing:'0.08em', textTransform:'uppercase', textAlign:'center', lineHeight:1.4, marginTop:2 }}>
+            {weather?.description ?? 'WEATHER'}
           </p>
         </div>
 
         {/* Nav */}
-        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3, flex:1, width:'100%', padding:'0 8px' }}>
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2, flex:1, width:'100%', padding:'0 8px' }}>
           {NAV.map(({ id, icon: Icon, label }) => {
             const active = activeView === id
             return (
@@ -99,33 +100,30 @@ export default function App() {
               >
                 <motion.button
                   onClick={() => setActiveView(id)}
-                  whileTap={{ scale: 0.92 }}
+                  whileTap={{ scale: 0.93 }}
                   style={{
-                    width: '100%', height: 46,
-                    borderRadius: 'var(--radius-md)',
+                    width: '100%', height: 52,
+                    borderRadius: 12,
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    gap: 2, border: 'none',
-                    background: active ? 'rgba(0,122,255,0.1)' : hovered === id ? 'rgba(0,0,0,0.05)' : 'transparent',
+                    gap: 3, border: 'none',
+                    background: active ? 'var(--pink)' : hovered === id ? 'rgba(0,0,0,0.04)' : 'transparent',
                     cursor: 'pointer', transition: 'background 150ms ease',
                   }}
                 >
                   <Icon
                     size={20}
-                    strokeWidth={active ? 2.3 : 1.8}
-                    color={active ? 'var(--blue)' : 'var(--text-3)'}
+                    strokeWidth={active ? 2.2 : 1.6}
+                    color={active ? 'var(--pink-text)' : 'var(--text-3)'}
                   />
                   <span style={{
                     fontSize: 9, fontWeight: active ? 700 : 500,
-                    color: active ? 'var(--blue)' : 'var(--text-3)',
-                    fontFamily: 'var(--font-body)', lineHeight: 1,
+                    color: active ? 'var(--pink-text)' : 'var(--text-3)',
+                    fontFamily: 'var(--font-body)',
+                    textTransform: 'uppercase', letterSpacing: '0.05em',
+                    lineHeight: 1,
                   }}>
                     {label}
                   </span>
-                  {active && (
-                    <motion.div layoutId="sidebar-bar"
-                      style={{ position:'absolute', right:0, width:3, height:24, borderRadius:'2px 0 0 2px', background:'var(--blue)' }}
-                    />
-                  )}
                 </motion.button>
 
                 <AnimatePresence>
