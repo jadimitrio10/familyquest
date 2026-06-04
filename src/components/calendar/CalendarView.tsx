@@ -304,12 +304,12 @@ export function CalendarView({ members: rawMembers, calPrefs }: { members?: Memb
 
   const nextLabel = `${format(addDays(weekStart,7),'MMM d')}–${format(addDays(weekStart,13),'MMM d')}`
 
-  // ── Per-member stats for the VISIBLE WEEK (shown in member chips) ────────
+  // ── Per-member stats for TODAY (shown in member chips) ──────────────────
   const memberStats = useMemo((): Record<string, MemberStat> => {
-    const weekSet = new Set(weekDates)
+    const today = format(new Date(), 'yyyy-MM-dd')
     const stats: Record<string, MemberStat> = {}
     for (const ev of allEvents) {
-      if (!ev.memberId || !weekSet.has(ev.date)) continue
+      if (!ev.memberId || ev.date !== today) continue
       if (!stats[ev.memberId]) stats[ev.memberId] = { done: 0, total: 0 }
       stats[ev.memberId].total++
       if (ev.completed) stats[ev.memberId].done++
