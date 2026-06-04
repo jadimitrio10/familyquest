@@ -36,7 +36,7 @@ export default function App() {
   const [connected, setConnected]   = useState<boolean>(() => !!localStorage.getItem(FAMILY_ID_KEY))
   const { settings, update } = useAppSettings()
   const { members } = useMembersStore()
-  const { prefs: calPrefs } = useCalendarPrefs()
+  const { prefs: calPrefs, update: updateCalPrefs } = useCalendarPrefs()
   const weather = useWeather()
   const [clockTime, setClockTime] = useState('')
   const { t }                    = useT()
@@ -246,7 +246,7 @@ export default function App() {
             transition={{ duration:0.16, ease:'easeInOut' }}
             style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column' }}
           >
-            {activeView === 'calendar'  && <CalendarView members={members} calPrefs={calPrefs} />}
+            {activeView === 'calendar'  && <CalendarView members={members} calPrefs={calPrefs} updateCalPrefs={updateCalPrefs} />}
             {activeView === 'tasks'     && <TasksView />}
             {activeView === 'rewards'   && <RewardsView />}
             {activeView === 'meals'     && <MealsView />}
