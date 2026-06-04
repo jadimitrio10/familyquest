@@ -230,7 +230,7 @@ export function CalendarTopBar({
                     </span>
                   </div>
                 ) : stat && stat.total === 0 ? (
-                  <span style={{ fontSize:10, color:'#C7C7CC', fontFamily:'var(--font-body)' }}>sin tasks hoy</span>
+                  <span style={{ fontSize:10, color:'#C7C7CC', fontFamily:'var(--font-body)' }}>sin tasks</span>
                 ) : null}
               </div>
             </motion.button>
