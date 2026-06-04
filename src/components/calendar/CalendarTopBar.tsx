@@ -1,5 +1,6 @@
-import { motion } from 'framer-motion'
-import { ChevronLeft, ChevronRight, SlidersHorizontal, Plus } from 'lucide-react'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { ChevronLeft, ChevronRight, SlidersHorizontal, Plus, Check as CheckIcon } from 'lucide-react'
 import { format } from 'date-fns'
 import { useWeather } from '@/hooks/useWeather'
 import { useMembersStore } from '@/hooks/useMembersStore'
@@ -14,6 +15,8 @@ export interface MemberStat {
   total: number
 }
 
+export type ViewMode = 'week' | 'day' | 'month' | 'agenda'
+
 interface CalendarTopBarProps {
   weekStart: Date
   weekEnd: Date
@@ -24,21 +27,29 @@ interface CalendarTopBarProps {
   onToggleMember: (id: string) => void
   familyEvents?: FamilyEvent[]
   onEditFamilyEvents?: () => void
-  memberStats?: Record<string, MemberStat>   // ← NEW: completion data per member
+  memberStats?: Record<string, MemberStat>
+  viewMode?: ViewMode
+  onViewChange?: (v: ViewMode) => void
+  rangeLabel?: string   // override for day view ("Mon Jun 4")
+}
+
+const VIEW_LABELS: Record<ViewMode, string> = {
+  week: 'Week', day: 'Day', month: 'Month', agenda: 'Agenda'
 }
 
 export function CalendarTopBar({
   weekStart, weekEnd, onAddEvent, onPrev, onNext,
   activeMember, onToggleMember, familyEvents = [], onEditFamilyEvents,
-  memberStats = {},
+  memberStats = {}, viewMode = 'week', onViewChange, rangeLabel,
 }: CalendarTopBarProps) {
   const weather       = useWeather()
   const { members }   = useMembersStore()
   const { settings }  = useAppSettings()
   const { t }         = useT()
+  const [showViewMenu, setShowViewMenu] = useState(false)
   const now           = new Date()
   const timeStr       = format(now, 'h:mm aa')
-  const rangeStr      = `${format(weekStart,'MMM d')}–${format(weekEnd,'d')}`
+  const rangeStr      = rangeLabel ?? `${format(weekStart,'MMM d')}–${format(weekEnd,'d')}`
 
   return (
     <div style={{ background: 'var(--bg)', flexShrink: 0 }}>
@@ -65,10 +76,38 @@ export function CalendarTopBar({
 
         <div style={{ flex:1 }} />
 
-        {/* Week pill */}
-        <div style={{ display:'flex', alignItems:'center', gap:3, background:'#fff', border:'1px solid #EEE8E0', padding:'7px 16px', borderRadius:100, cursor:'pointer', boxShadow:'0 1px 3px rgba(0,0,0,0.05)' }}>
-          <span style={{ fontSize:13, fontWeight:600, fontFamily:'var(--font-body)', color:'#2D3748' }}>Week</span>
-          <ChevronRight size={11} color="#A0AEC0" />
+        {/* View mode switcher */}
+        <div style={{ position:'relative' }}>
+          <motion.button
+            onClick={() => setShowViewMenu(v => !v)}
+            whileTap={{ scale:0.95 }}
+            style={{ display:'flex', alignItems:'center', gap:5, background:'#fff', border:'1px solid #EEE8E0', padding:'7px 14px', borderRadius:100, cursor:'pointer', boxShadow:'0 1px 3px rgba(0,0,0,0.05)' }}
+          >
+            <span style={{ fontSize:13, fontWeight:700, fontFamily:'var(--font-body)', color:'#2D3748' }}>{VIEW_LABELS[viewMode]}</span>
+            <ChevronRight size={11} color="#A0AEC0" style={{ transform: showViewMenu ? 'rotate(90deg)' : 'none', transition:'transform 0.2s' }} />
+          </motion.button>
+
+          <AnimatePresence>
+            {showViewMenu && (
+              <motion.div
+                initial={{ opacity:0, y:-6, scale:0.97 }}
+                animate={{ opacity:1, y:0, scale:1 }}
+                exit={{ opacity:0, y:-6, scale:0.97 }}
+                transition={{ duration:0.12 }}
+                style={{ position:'absolute', top:'calc(100% + 6px)', left:0, background:'#fff', border:'1px solid #EEE8E0', borderRadius:14, boxShadow:'0 8px 24px rgba(0,0,0,0.12)', zIndex:50, overflow:'hidden', minWidth:130 }}
+              >
+                {(['week','day','month','agenda'] as ViewMode[]).map(v => (
+                  <button key={v} onClick={() => { onViewChange?.(v); setShowViewMenu(false) }}
+                    style={{ width:'100%', padding:'10px 16px', border:'none', background: viewMode===v ? 'rgba(0,122,255,0.06)' : 'transparent', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', gap:8 }}>
+                    <span style={{ fontSize:14, fontWeight: viewMode===v ? 700 : 500, color: viewMode===v ? '#007AFF' : '#2D3748', fontFamily:'var(--font-body)' }}>
+                      {VIEW_LABELS[v]}
+                    </span>
+                    {viewMode===v && <CheckIcon size={14} color="#007AFF" />}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Date range */}

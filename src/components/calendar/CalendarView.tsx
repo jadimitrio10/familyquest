@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
+import toast from 'react-hot-toast'
 import { usePointsStore } from '@/hooks/usePointsStore'
 import { CelebrationOverlay } from '@/components/shared/CelebrationOverlay'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, Trash2 } from 'lucide-react'
 import type { CalendarPrefs } from '@/hooks/useCalendarPrefs'
 import { useT, T } from '@/lib/i18n'
-import { CalendarTopBar, type MemberStat } from './CalendarTopBar'
+import { CalendarTopBar, type MemberStat, type ViewMode } from './CalendarTopBar'
 import { MemberChip } from './MemberChip'
 import { AddEventModal } from './AddEventModal'
 import { EventDetailModal } from './EventDetailModal'
@@ -213,7 +214,17 @@ export function CalendarView({ members: rawMembers, calPrefs }: { members?: Memb
   const [showAdd, setShowAdd]             = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent|null>(null)
   const [weekOffset, setWeekOffset]       = useState(0)
+  const [dayOffset, setDayOffset]         = useState(0)   // for day view
   const [tick, setTick]                   = useState(0)
+  // View mode — initialized from calPrefs.defaultView, user can override in the header
+  const [viewMode, setViewMode] = useState<ViewMode>((calPrefs?.defaultView as ViewMode) ?? 'week')
+
+  // Sync viewMode if calPrefs.defaultView changes externally (e.g. settings page)
+  const prevDefaultView = calPrefs?.defaultView
+  useEffect(() => {
+    if (prevDefaultView) setViewMode(prevDefaultView as ViewMode)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calPrefs?.defaultView])
 
   // Family events
   const [familyEvents, setFamilyEvents] = useState<FamilyEvent[]>(loadFamilyEvents)
@@ -337,17 +348,61 @@ export function CalendarView({ members: rawMembers, calPrefs }: { members?: Memb
         weekStart={weekStart}
         weekEnd={addDays(weekStart,6)}
         onAddEvent={() => setShowAdd(true)}
-        onPrev={() => setWeekOffset(o => o-1)}
-        onNext={() => setWeekOffset(o => o+1)}
+        onPrev={() => viewMode==='day' ? setDayOffset(o=>o-1) : setWeekOffset(o => o-1)}
+        onNext={() => viewMode==='day' ? setDayOffset(o=>o+1) : setWeekOffset(o => o+1)}
         activeMember={activeMember}
         onToggleMember={(id) => setActiveMember(prev => prev === id || id === '' ? null : id)}
         familyEvents={familyEvents}
         onEditFamilyEvents={() => setShowFamilyModal(true)}
         memberStats={memberStats}
+        viewMode={viewMode}
+        onViewChange={v => {
+          if (v === 'month' || v === 'agenda') { toast('Próximamente 🚀'); return }
+          setViewMode(v)
+        }}
+        rangeLabel={viewMode==='day' ? format(addDays(new Date(), dayOffset + weekOffset*7), 'EEE, MMM d') : undefined}
       />
 
-      {/* Calendar body — time grid exactly like Stitch */}
-      <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column', margin:'0 12px 0' }}>
+      {/* ── DAY VIEW ─────────────────────────────────────────────────────── */}
+      {viewMode === 'day' && (() => {
+        const dayDate = addDays(new Date(), dayOffset + weekOffset*7)
+        const dayStr  = format(dayDate, 'yyyy-MM-dd')
+        const isToday = dayStr === format(new Date(), 'yyyy-MM-dd')
+        const dayLabel = { date:dayStr, num:dayDate.getDate(), label:format(dayDate,'EEE').toUpperCase(), isToday }
+        const dayEvents = eventsForDay(dayStr)
+        return (
+          <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column', margin:'0 12px 0' }}>
+            <AnimatePresence mode="wait">
+              <motion.div key={`day-${dayStr}`}
+                initial={{ opacity:0, x: dayOffset>0?20:-20 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0 }}
+                transition={{ duration:0.18 }}
+                style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden', background:'#fff', borderRadius:'14px 14px 0 0', border:'1px solid #EEE8E0', borderBottom:'none' }}
+              >
+                {/* Single day header */}
+                <div style={{ display:'grid', gridTemplateColumns:'80px 1fr', borderBottom:'1px solid #EEE8E0' }}>
+                  <div style={{ padding:'12px 8px' }} />
+                  <DayHeader day={dayLabel} />
+                </div>
+                {/* Single day time grid */}
+                <div style={{ flex:1, overflowY:'auto' }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'80px 1fr', height: HOURS.length*HOUR_H, position:'relative' }}>
+                    {currentTimeY >= 0 && (
+                      <div style={{ position:'absolute', left:80, right:0, top:currentTimeY, height:2, background:'#F87171', zIndex:20, pointerEvents:'none' }}>
+                        <div style={{ position:'absolute', left:-4, top:-3, width:8, height:8, borderRadius:'50%', background:'#F87171' }} />
+                      </div>
+                    )}
+                    <TimeAxis />
+                    <TimeColumn events={dayEvents} members={MEMBERS} onToggle={handleToggle} onEventClick={setSelectedEvent} colIndex={0} />
+                  </div>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        )
+      })()}
+
+      {/* Calendar body — WEEK VIEW */}
+      {viewMode !== 'day' && <div style={{ flex:1, overflow:'hidden', display:'flex', flexDirection:'column', margin:'0 12px 0' }}>
         <AnimatePresence mode="wait">
           <motion.div key={weekOffset}
             initial={{ opacity:0, x:weekOffset>0?20:-20 }}
@@ -413,7 +468,7 @@ export function CalendarView({ members: rawMembers, calPrefs }: { members?: Memb
             </div>
           </motion.div>
         </AnimatePresence>
-      </div>
+      </div>}
 
       {/* FAB */}
       <motion.button onClick={() => setShowAdd(true)} whileHover={{ scale:1.08 }} whileTap={{ scale:0.92 }}
