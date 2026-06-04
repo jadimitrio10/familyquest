@@ -5,6 +5,7 @@ import { CelebrationOverlay } from '@/components/shared/CelebrationOverlay'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, Trash2 } from 'lucide-react'
 import type { CalendarPrefs } from '@/hooks/useCalendarPrefs'
+import { useCalendarPrefs } from '@/hooks/useCalendarPrefs'
 import { useT, T } from '@/lib/i18n'
 import { CalendarTopBar, type MemberStat, type ViewMode } from './CalendarTopBar'
 import { MemberChip } from './MemberChip'
@@ -216,10 +217,13 @@ export function CalendarView({ members: rawMembers, calPrefs }: { members?: Memb
   const [weekOffset, setWeekOffset]       = useState(0)
   const [dayOffset, setDayOffset]         = useState(0)   // for day view
   const [tick, setTick]                   = useState(0)
-  // View mode — initialized from calPrefs.defaultView, user can override in the header
+  // Own calPrefs hook instance — so we can persist view changes directly
+  const { update: updateCalPrefs } = useCalendarPrefs()
+
+  // View mode — read from shared calPrefs (singleton, always fresh from localStorage)
   const [viewMode, setViewMode] = useState<ViewMode>((calPrefs?.defaultView as ViewMode) ?? 'week')
 
-  // Sync viewMode whenever calPrefs.defaultView changes (e.g. changed in Settings)
+  // Keep viewMode in sync when Settings changes defaultView
   useEffect(() => {
     if (calPrefs?.defaultView) setViewMode(calPrefs.defaultView as ViewMode)
   }, [calPrefs?.defaultView])
@@ -357,6 +361,7 @@ export function CalendarView({ members: rawMembers, calPrefs }: { members?: Memb
         onViewChange={v => {
           if (v === 'month' || v === 'agenda') { toast('Próximamente 🚀'); return }
           setViewMode(v)
+          updateCalPrefs({ defaultView: v })   // persist so refresh remembers the choice
         }}
         rangeLabel={viewMode==='day' ? format(addDays(new Date(), dayOffset + weekOffset*7), 'EEE, MMM d') : undefined}
       />
