@@ -23,15 +23,28 @@ function load(): CalendarPrefs {
   } catch { return DEFAULTS }
 }
 
-export function useCalendarPrefs() {
-  const [prefs, setPrefs] = useState<CalendarPrefs>(load)
+// ── Singleton shared state — all hook instances stay in sync ───────────────
+let _prefs: CalendarPrefs = load()
+const _listeners = new Set<(p: CalendarPrefs) => void>()
 
+function _notify(p: CalendarPrefs) {
+  _listeners.forEach(fn => fn(p))
+}
+
+export function useCalendarPrefs() {
+  const [prefs, setPrefs] = useState<CalendarPrefs>(_prefs)
+
+  // Register this instance so it receives updates from other instances
   useEffect(() => {
-    try { localStorage.setItem(KEY, JSON.stringify(prefs)) } catch {}
-  }, [prefs])
+    _listeners.add(setPrefs)
+    return () => { _listeners.delete(setPrefs) }
+  }, [])
 
   function update(patch: Partial<CalendarPrefs>) {
-    setPrefs(p => ({ ...p, ...patch }))
+    const next = { ..._prefs, ...patch }
+    _prefs = next
+    try { localStorage.setItem(KEY, JSON.stringify(next)) } catch {}
+    _notify(next)   // instantly updates ALL hook instances across the app
   }
 
   return { prefs, update }

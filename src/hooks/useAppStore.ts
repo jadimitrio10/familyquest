@@ -2,19 +2,37 @@ import { useState, useEffect } from 'react'
 import type { AppSettings } from '@/types/app.types'
 import { DEFAULT_SETTINGS } from '@/types/app.types'
 
-function load<T>(key: string, fallback: T): T {
+const KEY = 'fq_settings'
+
+function load(): AppSettings {
   try {
-    const v = localStorage.getItem(key)
-    return v ? (JSON.parse(v) as T) : fallback
-  } catch { return fallback }
+    const v = localStorage.getItem(KEY)
+    return v ? { ...DEFAULT_SETTINGS, ...JSON.parse(v) } : DEFAULT_SETTINGS
+  } catch { return DEFAULT_SETTINGS }
 }
-function save(key: string, val: unknown) {
-  try { localStorage.setItem(key, JSON.stringify(val)) } catch {}
+
+// ── Singleton shared state — all hook instances stay in sync ───────────────
+let _settings: AppSettings = load()
+const _listeners = new Set<(s: AppSettings) => void>()
+
+function _notify(s: AppSettings) {
+  _listeners.forEach(fn => fn(s))
 }
 
 export function useAppSettings() {
-  const [settings, setSettings] = useState<AppSettings>(() => load('fq_settings', DEFAULT_SETTINGS))
-  useEffect(() => { save('fq_settings', settings) }, [settings])
-  const update = (patch: Partial<AppSettings>) => setSettings(s => ({ ...s, ...patch }))
+  const [settings, setSettings] = useState<AppSettings>(_settings)
+
+  useEffect(() => {
+    _listeners.add(setSettings)
+    return () => { _listeners.delete(setSettings) }
+  }, [])
+
+  function update(patch: Partial<AppSettings>) {
+    const next = { ..._settings, ...patch }
+    _settings = next
+    try { localStorage.setItem(KEY, JSON.stringify(next)) } catch {}
+    _notify(next)   // instantly updates ALL hook instances (App, CalendarTopBar, etc.)
+  }
+
   return { settings, update, setSettings }
 }

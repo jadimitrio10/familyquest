@@ -219,11 +219,9 @@ export function CalendarView({ members: rawMembers, calPrefs }: { members?: Memb
   // View mode — initialized from calPrefs.defaultView, user can override in the header
   const [viewMode, setViewMode] = useState<ViewMode>((calPrefs?.defaultView as ViewMode) ?? 'week')
 
-  // Sync viewMode if calPrefs.defaultView changes externally (e.g. settings page)
-  const prevDefaultView = calPrefs?.defaultView
+  // Sync viewMode whenever calPrefs.defaultView changes (e.g. changed in Settings)
   useEffect(() => {
-    if (prevDefaultView) setViewMode(prevDefaultView as ViewMode)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (calPrefs?.defaultView) setViewMode(calPrefs.defaultView as ViewMode)
   }, [calPrefs?.defaultView])
 
   // Family events
