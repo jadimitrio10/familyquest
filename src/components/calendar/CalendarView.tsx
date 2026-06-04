@@ -526,32 +526,53 @@ function TimeColumn({ events, members, onToggle, onEventClick, colIndex, compact
               transition={{ delay:colIndex*0.03+i*0.03 }}
               onClick={() => onEventClick(event)}
               style={{
-                background:bg, borderRadius:12, padding:'8px 10px 7px', marginBottom:5,
-                border:'1px solid rgba(255,255,255,0.65)', cursor:'pointer',
+                background: event.completed ? '#F0FDF4' : bg,
+                borderRadius:12, padding:'7px 8px 7px', marginBottom:5,
+                border: event.completed ? '1.5px solid #86EFAC' : '1px solid rgba(255,255,255,0.65)',
+                cursor:'pointer',
                 boxShadow:'0 1px 5px rgba(0,0,0,0.06)',
-                opacity: event.completed ? 0.58 : 1,
+                transition:'all 0.2s',
               }}
               whileHover={{ filter:'brightness(0.97)' }}
             >
-              <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:6 }}>
-                <p style={{ fontWeight:700, fontSize:12, color:textC, lineHeight:1.2, fontFamily:'var(--font-heading)', flex:1, textDecoration:event.completed?'line-through':'none' }}>
-                  {event.emoji && event.emoji!=='📅' ? `${event.emoji} ` : ''}{event.title}
-                </p>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                {/* Big tap-target check button */}
                 <motion.button
                   onClick={e=>{e.stopPropagation();onToggle(event.id)}}
-                  whileTap={{ scale:0.78 }}
-                  style={{ width:19,height:19,borderRadius:'50%',flexShrink:0,border:event.completed?'none':`1.5px solid ${barC}80`,background:event.completed?barC:'rgba(255,255,255,0.55)',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.2s' }}
+                  whileTap={{ scale:0.75 }}
+                  animate={{ scale: event.completed ? [1.2, 1] : 1 }}
+                  style={{
+                    width:22, height:22, borderRadius:'50%', flexShrink:0,
+                    border: event.completed ? 'none' : `2px solid ${barC}`,
+                    background: event.completed ? '#22C55E' : 'rgba(255,255,255,0.70)',
+                    cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center',
+                    transition:'background 0.2s, border 0.2s',
+                    boxShadow: event.completed ? '0 2px 6px rgba(34,197,94,0.35)' : 'none',
+                  }}
                 >
-                  {event.completed && <Check size={11} color="#fff" strokeWidth={3} />}
+                  {event.completed && <Check size={13} color="#fff" strokeWidth={3} />}
                 </motion.button>
-              </div>
-              {/* Avatar bottom right — photo or emoji/initial */}
-              <div style={{ display:'flex', justifyContent:'flex-end', marginTop:4 }}>
+
+                {/* Title — strikethrough when done */}
+                <p style={{
+                  fontWeight: event.completed ? 500 : 700,
+                  fontSize:12, lineHeight:1.2,
+                  fontFamily:'var(--font-heading)', flex:1,
+                  color: event.completed ? '#86EFAC' : textC,
+                  textDecoration: event.completed ? 'line-through' : 'none',
+                  textDecorationColor: '#22C55E',
+                  textDecorationThickness: '2px',
+                  transition:'all 0.2s',
+                }}>
+                  {event.emoji && event.emoji!=='📅' ? `${event.emoji} ` : ''}{event.title}
+                </p>
+
+                {/* Avatar */}
                 {member.photoDataUrl ? (
                   <img src={member.photoDataUrl} alt={member.name}
-                    style={{ width:22,height:22,borderRadius:'50%',objectFit:'cover',border:`2px solid ${barC}`,boxShadow:'0 1px 4px rgba(0,0,0,0.15)' }} />
+                    style={{ width:20,height:20,borderRadius:'50%',objectFit:'cover',border:`2px solid ${event.completed?'#86EFAC':barC}`,flexShrink:0 }} />
                 ) : (
-                  <div style={{ width:22,height:22,borderRadius:'50%',background:member.bgColor,border:`2px solid ${barC}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:12,boxShadow:'0 1px 4px rgba(0,0,0,0.10)' }}>
+                  <div style={{ width:20,height:20,borderRadius:'50%',background:event.completed?'#DCFCE7':member.bgColor,border:`2px solid ${event.completed?'#86EFAC':barC}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,flexShrink:0 }}>
                     {member.emoji || (member.avatar||member.name||'?')[0]}
                   </div>
                 )}
@@ -583,33 +604,49 @@ function TimeColumn({ events, members, onToggle, onEventClick, colIndex, compact
             initial={{ opacity:0 }} animate={{ opacity:1 }}
             style={{
               position:'absolute',
-              // Each event occupies 1/totalCols of the column width
               left: `calc(${gutter}px + ${col} * (100% - ${gutter*2}px) / ${totalCols} + ${col > 0 ? 2 : 0}px)`,
               width: `calc((100% - ${gutter * 2 + (totalCols - 1) * 2}px) / ${totalCols})`,
               top, height:h,
-              background:bg, borderRadius:12,
-              border: `2px solid rgba(255,255,255,0.80)`,
+              background: event.completed ? '#F0FDF4' : bg,
+              borderRadius:12,
+              border: event.completed ? '2px solid #86EFAC' : `2px solid rgba(255,255,255,0.80)`,
               boxShadow: totalCols > 1
                 ? `0 2px 8px rgba(0,0,0,0.10), 0 0 0 1px ${barC}30`
                 : '0 2px 8px rgba(0,0,0,0.07)',
               padding: totalCols > 1 ? '8px 8px' : '10px 12px',
               cursor:'pointer', overflow:'hidden',
               display:'flex', flexDirection:'column', justifyContent:'space-between',
+              transition:'background 0.2s, border 0.2s',
             }}
             whileHover={{ filter:'brightness(0.95)', zIndex:10 }}
           >
-            <p style={{ fontWeight:700, fontSize: totalCols > 1 ? 11 : 13, color:textC, fontFamily:'var(--font-heading)', lineHeight:1.2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace: totalCols > 2 ? 'nowrap' : 'normal' }}>
+            {/* Completed green overlay badge */}
+            {event.completed && (
+              <div style={{ position:'absolute', top:6, right:6, width:18, height:18, borderRadius:'50%', background:'#22C55E', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 1px 4px rgba(34,197,94,0.4)' }}>
+                <Check size={11} color="#fff" strokeWidth={3} />
+              </div>
+            )}
+            <p style={{
+              fontWeight: event.completed ? 500 : 700,
+              fontSize: totalCols > 1 ? 11 : 13,
+              color: event.completed ? '#16A34A' : textC,
+              fontFamily:'var(--font-heading)', lineHeight:1.2,
+              overflow:'hidden', textOverflow:'ellipsis',
+              whiteSpace: totalCols > 2 ? 'nowrap' : 'normal',
+              textDecoration: event.completed ? 'line-through' : 'none',
+              textDecorationColor:'#22C55E', textDecorationThickness:'2px',
+            }}>
               {event.emoji && event.emoji !== '📅' ? `${event.emoji} ` : ''}{event.title}
             </p>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginTop:4 }}>
-              <p style={{ fontSize: totalCols > 1 ? 10 : 11, fontWeight:500, color:textC, opacity:0.60, fontFamily:'var(--font-body)' }}>
+              <p style={{ fontSize: totalCols > 1 ? 10 : 11, fontWeight:500, color: event.completed ? '#86EFAC' : textC, opacity:0.70, fontFamily:'var(--font-body)' }}>
                 {event.startTime}{event.endTime ? ` - ${event.endTime}` : ''}
               </p>
               {member.photoDataUrl ? (
                 <img src={member.photoDataUrl} alt={member.name}
-                  style={{ width:22,height:22,borderRadius:'50%',objectFit:'cover',border:`2px solid ${barC}`,flexShrink:0,boxShadow:'0 1px 4px rgba(0,0,0,0.15)' }} />
+                  style={{ width:20,height:20,borderRadius:'50%',objectFit:'cover',border:`2px solid ${event.completed?'#86EFAC':barC}`,flexShrink:0 }} />
               ) : (
-                <div style={{ width:22,height:22,borderRadius:'50%',background:member.bgColor,border:`2px solid ${barC}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,flexShrink:0 }}>
+                <div style={{ width:20,height:20,borderRadius:'50%',background:event.completed?'#DCFCE7':member.bgColor,border:`2px solid ${event.completed?'#86EFAC':barC}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,flexShrink:0 }}>
                   {member.emoji || (member.avatar||'?')[0]}
                 </div>
               )}
