@@ -58,12 +58,14 @@ export default function App() {
     document.documentElement.style.setProperty('--accent-bg', color + '20')
   }, [(settings as any).accentColor])
 
-  // ── Apply font size as CSS variable ───────────────────────────────────
+  // ── Apply font size via CSS zoom on #root ────────────────────────────
+  // The app uses px-based inline styles, so root font-size does nothing.
+  // CSS zoom scales everything uniformly including px values.
   useEffect(() => {
-    const map: Record<string, string> = { small:'13px', normal:'15px', large:'17px', xlarge:'19px' }
-    const size = map[(settings as any).fontSize || 'normal'] ?? '15px'
-    document.documentElement.style.setProperty('--font-size-base', size)
-    document.documentElement.style.fontSize = size
+    const map: Record<string, number> = { small: 0.88, normal: 1, large: 1.13, xlarge: 1.27 }
+    const zoom = map[(settings as any).fontSize || 'normal'] ?? 1
+    const root = document.getElementById('root')
+    if (root) (root.style as any).zoom = String(zoom)
   }, [(settings as any).fontSize])
 
   // syncTick kept only for the cloud sync indicator; NOT used as a view key
