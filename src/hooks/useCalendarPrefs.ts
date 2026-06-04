@@ -7,7 +7,8 @@ export interface CalendarPrefs {
   showWeekends:   boolean
 }
 
-const KEY = 'fq_calendar_prefs_v1'
+const KEY   = 'fq_calendar_prefs_v1'
+const EVENT = 'fq:calprefs'   // custom DOM event — reliable across any component tree
 
 const DEFAULTS: CalendarPrefs = {
   defaultView:  'week',
@@ -23,28 +24,21 @@ function load(): CalendarPrefs {
   } catch { return DEFAULTS }
 }
 
-// ── Singleton shared state — all hook instances stay in sync ───────────────
-let _prefs: CalendarPrefs = load()
-const _listeners = new Set<(p: CalendarPrefs) => void>()
-
-function _notify(p: CalendarPrefs) {
-  _listeners.forEach(fn => fn(p))
-}
-
 export function useCalendarPrefs() {
-  const [prefs, setPrefs] = useState<CalendarPrefs>(_prefs)
+  const [prefs, setPrefs] = useState<CalendarPrefs>(load)
 
-  // Register this instance so it receives updates from other instances
+  // Listen for changes made by ANY component (Settings, Calendar header, etc.)
   useEffect(() => {
-    _listeners.add(setPrefs)
-    return () => { _listeners.delete(setPrefs) }
+    const handler = () => setPrefs(load())
+    window.addEventListener(EVENT, handler)
+    return () => window.removeEventListener(EVENT, handler)
   }, [])
 
   function update(patch: Partial<CalendarPrefs>) {
-    const next = { ..._prefs, ...patch }
-    _prefs = next
-    try { localStorage.setItem(KEY, JSON.stringify(next)) } catch {}
-    _notify(next)   // instantly updates ALL hook instances across the app
+    const next = { ...load(), ...patch }       // always read fresh — no stale closure
+    localStorage.setItem(KEY, JSON.stringify(next))
+    setPrefs(next)                             // update THIS instance immediately
+    window.dispatchEvent(new Event(EVENT))     // notify every other instance
   }
 
   return { prefs, update }
