@@ -217,16 +217,9 @@ export function CalendarView({ members: rawMembers, calPrefs }: { members?: Memb
   const [weekOffset, setWeekOffset]       = useState(0)
   const [dayOffset, setDayOffset]         = useState(0)   // for day view
   const [tick, setTick]                   = useState(0)
-  // Own calPrefs hook instance — so we can persist view changes directly
+  // viewMode derives directly from calPrefs — no local state, no sync issues
   const { update: updateCalPrefs } = useCalendarPrefs()
-
-  // View mode — read from shared calPrefs (singleton, always fresh from localStorage)
-  const [viewMode, setViewMode] = useState<ViewMode>((calPrefs?.defaultView as ViewMode) ?? 'week')
-
-  // Keep viewMode in sync when Settings changes defaultView
-  useEffect(() => {
-    if (calPrefs?.defaultView) setViewMode(calPrefs.defaultView as ViewMode)
-  }, [calPrefs?.defaultView])
+  const viewMode: ViewMode = (calPrefs?.defaultView as ViewMode) ?? 'week'
 
   // Family events
   const [familyEvents, setFamilyEvents] = useState<FamilyEvent[]>(loadFamilyEvents)
@@ -360,8 +353,7 @@ export function CalendarView({ members: rawMembers, calPrefs }: { members?: Memb
         viewMode={viewMode}
         onViewChange={v => {
           if (v === 'month' || v === 'agenda') { toast('Próximamente 🚀'); return }
-          setViewMode(v)
-          updateCalPrefs({ defaultView: v })   // persist so refresh remembers the choice
+          updateCalPrefs({ defaultView: v })   // single source of truth → re-renders instantly
         }}
         rangeLabel={viewMode==='day' ? format(addDays(new Date(), dayOffset + weekOffset*7), 'EEE, MMM d') : undefined}
       />
