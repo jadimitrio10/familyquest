@@ -225,10 +225,39 @@ export async function downloadFamilyData(familyId: string): Promise<void> {
 
   if (settR.data) {
     const s = settR.data as any
-    if (s.settings && Object.keys(s.settings).length > 0)
-      localStorage.setItem(LS.settings, JSON.stringify(s.settings))
-    if (s.calendar_prefs && Object.keys(s.calendar_prefs).length > 0)
-      localStorage.setItem(LS.calPrefs, JSON.stringify(s.calendar_prefs))
+
+    // Merge settings: cloud wins for FAMILY data, local wins for DEVICE preferences
+    // Device prefs (fontSize, theme, accentColor, language, silentHours, etc.) are
+    // per-device and must not be overwritten by another device's cloud data.
+    if (s.settings && Object.keys(s.settings).length > 0) {
+      const DEVICE_ONLY_KEYS = [
+        'fontSize','theme','accentColor','language',
+        'silentHours','silentFrom','silentTo','twoFAEnabled',
+      ]
+      let local: Record<string,unknown> = {}
+      try { local = JSON.parse(localStorage.getItem(LS.settings) || '{}') } catch {}
+
+      const merged: Record<string,unknown> = { ...s.settings }
+      for (const k of DEVICE_ONLY_KEYS) {
+        if (k in local) merged[k] = local[k]   // keep local device value
+      }
+      localStorage.setItem(LS.settings, JSON.stringify(merged))
+      window.dispatchEvent(new Event('fq:settings'))   // notify all useAppSettings hooks
+    }
+
+    // Calendar prefs are also device-local (defaultView, etc.)
+    if (s.calendar_prefs && Object.keys(s.calendar_prefs).length > 0) {
+      const CAL_DEVICE_KEYS = ['defaultView']
+      let localCal: Record<string,unknown> = {}
+      try { localCal = JSON.parse(localStorage.getItem(LS.calPrefs) || '{}') } catch {}
+
+      const mergedCal: Record<string,unknown> = { ...s.calendar_prefs }
+      for (const k of CAL_DEVICE_KEYS) {
+        if (k in localCal) mergedCal[k] = localCal[k]
+      }
+      localStorage.setItem(LS.calPrefs, JSON.stringify(mergedCal))
+      window.dispatchEvent(new Event('fq:calprefs'))   // notify all useCalendarPrefs hooks
+    }
   }
 
   console.log('[sync] ✅ Download complete! members:', membersR.data?.length ?? 0,
