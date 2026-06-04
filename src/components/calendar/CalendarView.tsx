@@ -4,8 +4,8 @@ import { usePointsStore } from '@/hooks/usePointsStore'
 import { CelebrationOverlay } from '@/components/shared/CelebrationOverlay'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Plus, Trash2 } from 'lucide-react'
-import type { CalendarPrefs } from '@/hooks/useCalendarPrefs'
 import { useCalendarPrefs } from '@/hooks/useCalendarPrefs'
+import type { CalendarPrefs } from '@/hooks/useCalendarPrefs'
 import { useT, T } from '@/lib/i18n'
 import { CalendarTopBar, type MemberStat, type ViewMode } from './CalendarTopBar'
 import { MemberChip } from './MemberChip'
@@ -210,7 +210,9 @@ function toRichMembers(members: Member[]): RichMember[] {
 // Day labels are computed dynamically inside the component using useT()
 
 // ══════════════════════════════════════════════════════════
-export function CalendarView({ members: rawMembers, calPrefs }: { members?: Member[]; calPrefs?: CalendarPrefs }) {
+export function CalendarView({ members: rawMembers, calPrefs: _ignored }: { members?: Member[]; calPrefs?: CalendarPrefs }) {
+  // Read calPrefs DIRECTLY from the singleton hook — no prop-passing chain
+  const { prefs: calPrefs, update: updateCalPrefs } = useCalendarPrefs()
   const [activeMember, setActiveMember]   = useState<string|null>(null)
   const [showAdd, setShowAdd]             = useState(false)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent|null>(null)
@@ -218,7 +220,6 @@ export function CalendarView({ members: rawMembers, calPrefs }: { members?: Memb
   const [dayOffset, setDayOffset]         = useState(0)   // for day view
   const [tick, setTick]                   = useState(0)
   // viewMode derives directly from calPrefs — no local state, no sync issues
-  const { update: updateCalPrefs } = useCalendarPrefs()
   const viewMode: ViewMode = (calPrefs?.defaultView as ViewMode) ?? 'week'
 
   // Family events
